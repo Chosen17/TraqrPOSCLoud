@@ -1,0 +1,13 @@
+[workspace]
+members = [
+    "crates/cloud_api",
+    "crates/domain",
+    "crates/db",
+    "crates/sync",
+    "crates/auth",
+    "crates/billing",
+    "crates/storage",
+    "crates/ui"
+]
+
+resolver = "2"

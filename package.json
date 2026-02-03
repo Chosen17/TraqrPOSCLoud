@@ -1,0 +1,14 @@
+{
+  "name": "traqr-cloud-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build:css": "tailwindcss -i ./web/src/input.css -o ./web/public/css/output.css",
+    "watch:css": "tailwindcss -i ./web/src/input.css -o ./web/public/css/output.css --watch"
+  },
+  "devDependencies": {
+    "tailwindcss": "^3.4.17",
+    "autoprefixer": "^10.4.20",
+    "postcss": "^8.4.49"
+  }
+}

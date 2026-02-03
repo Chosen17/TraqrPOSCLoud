@@ -56,3 +56,16 @@ pub struct CommandAckRequest {
     pub status: String, // "acked" | "failed"
     pub result: Option<serde_json::Value>,
 }
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginRequest {
+    pub email: String,
+    pub password: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LoginResponse {
+    pub ok: bool,
+    pub message: String,
+    pub display_name: Option<String>,
+}

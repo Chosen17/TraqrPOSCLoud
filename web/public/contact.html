@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Contact — Traqr Cloud</title>
+  <meta name="description" content="Contact Traqr for sales, support, and device enquiries." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="/css/output.css" rel="stylesheet" />
+</head>
+<body class="min-h-screen flex flex-col">
+  <header class="sticky top-0 z-50 border-b border-ink-200/80 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <nav class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8" aria-label="Main">
+      <a href="/" class="font-display text-xl font-bold tracking-tight text-ink-900">Traqr <span class="text-traqr-600">Cloud</span></a>
+      <div class="flex items-center gap-6">
+        <a href="/" class="text-sm font-medium text-ink-600 hover:text-ink-900">Product</a>
+        <a href="/pricing.html" class="text-sm font-medium text-ink-600 hover:text-ink-900">Pricing</a>
+        <a href="/devices.html" class="text-sm font-medium text-ink-600 hover:text-ink-900">Devices</a>
+        <a href="/contact.html" class="text-sm font-medium text-ink-900">Contact</a>
+        <a href="/login.html" class="btn-primary text-sm">Log in</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="flex-1">
+    <section class="px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+      <div class="mx-auto max-w-2xl">
+        <h1 class="section-heading">Contact</h1>
+        <p class="mt-4 text-lg text-ink-600">Sales, support, or device enquiries — we’ll get back to you.</p>
+
+        <div class="mt-12 card">
+          <form action="#" method="post" class="space-y-6">
+            <div>
+              <label for="name" class="block text-sm font-medium text-ink-700">Name</label>
+              <input type="text" id="name" name="name" required class="mt-1 block w-full rounded-lg border border-ink-300 px-4 py-2.5 text-ink-900 shadow-sm focus:border-traqr-500 focus:ring-1 focus:ring-traqr-500" placeholder="Your name" />
+            </div>
+            <div>
+              <label for="email" class="block text-sm font-medium text-ink-700">Email</label>
+              <input type="email" id="email" name="email" required class="mt-1 block w-full rounded-lg border border-ink-300 px-4 py-2.5 text-ink-900 shadow-sm focus:border-traqr-500 focus:ring-1 focus:ring-traqr-500" placeholder="you@example.com" />
+            </div>
+            <div>
+              <label for="subject" class="block text-sm font-medium text-ink-700">Subject</label>
+              <select id="subject" name="subject" class="mt-1 block w-full rounded-lg border border-ink-300 px-4 py-2.5 text-ink-900 shadow-sm focus:border-traqr-500 focus:ring-1 focus:ring-traqr-500">
+                <option value="sales">Sales / pricing</option>
+                <option value="devices">Devices / activation</option>
+                <option value="support">Support</option>
+                <option value="other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label for="message" class="block text-sm font-medium text-ink-700">Message</label>
+              <textarea id="message" name="message" rows="4" required class="mt-1 block w-full rounded-lg border border-ink-300 px-4 py-2.5 text-ink-900 shadow-sm focus:border-traqr-500 focus:ring-1 focus:ring-traqr-500" placeholder="How can we help?"></textarea>
+            </div>
+            <button type="submit" class="btn-primary w-full sm:w-auto">Send message</button>
+          </form>
+          <p class="mt-4 text-sm text-ink-500">Form submission can be wired to your backend or email service later.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-ink-200 bg-white px-4 py-12 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-6xl">
+      <div class="flex flex-col items-center justify-between gap-6 sm:flex-row">
+        <a href="/" class="font-display text-lg font-bold text-ink-900">Traqr <span class="text-traqr-600">Cloud</span></a>
+        <div class="flex gap-8">
+          <a href="/pricing.html" class="text-sm text-ink-500 hover:text-ink-900">Pricing</a>
+          <a href="/devices.html" class="text-sm text-ink-500 hover:text-ink-900">Devices</a>
+          <a href="/contact.html" class="text-sm text-ink-500 hover:text-ink-900">Contact</a>
+        </div>
+      </div>
+      <p class="mt-8 text-center text-sm text-ink-500 sm:text-left">cloud.traqr.co.uk</p>
+    </div>
+  </footer>
+</body>
+</html>

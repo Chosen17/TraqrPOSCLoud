@@ -14,3 +14,9 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 domain = { path = "../domain" }
 db = { path = "../db" }
+chrono = { version = "0.4", features = ["serde"] }
+sha2 = "0.10"
+tower-http = { version = "0.6", features = ["fs"] }
+include_dir = "0.7"
+mime_guess = "2.0"
+dotenvy = "0.15"

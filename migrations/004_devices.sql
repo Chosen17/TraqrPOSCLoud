@@ -24,6 +24,11 @@ CREATE TABLE device_activation_keys (
   UNIQUE(org_id, key_hash)
 );
 
+-- Allow lookup by key_hash only when key is globally unique per issuance
+CREATE UNIQUE INDEX idx_device_activation_keys_key_hash_unique
+  ON device_activation_keys(key_hash)
+  WHERE revoked_at IS NULL;
+
 CREATE TABLE device_tokens (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   device_id uuid NOT NULL REFERENCES devices(id) ON DELETE CASCADE,

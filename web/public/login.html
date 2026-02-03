@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Log in — Traqr Cloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="/css/output.css" rel="stylesheet" />
+</head>
+<body class="min-h-screen flex flex-col bg-ink-100">
+  <header class="border-b border-ink-200 bg-white">
+    <nav class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
+      <a href="/" class="font-display text-xl font-bold tracking-tight text-ink-900">Traqr <span class="text-traqr-600">Cloud</span></a>
+      <a href="/" class="text-sm font-medium text-ink-600 hover:text-ink-900">Back to home</a>
+    </nav>
+  </header>
+
+  <main class="flex-1 flex items-center justify-center px-4 py-12">
+    <div class="w-full max-w-md">
+      <div class="card">
+        <h1 class="font-display text-2xl font-bold text-ink-900">Log in</h1>
+        <p class="mt-2 text-sm text-ink-600">Portal login. Use demo credentials below.</p>
+        <div id="message" class="mt-4 hidden rounded-lg border px-4 py-3 text-sm" role="alert"></div>
+        <form id="login-form" class="mt-6 space-y-6">
+          <div>
+            <label for="email" class="block text-sm font-medium text-ink-700">Email</label>
+            <input type="email" id="email" name="email" required class="mt-1 block w-full rounded-lg border border-ink-300 px-4 py-2.5 text-ink-900 shadow-sm focus:border-traqr-500 focus:ring-1 focus:ring-traqr-500" placeholder="admin@traqr.co.uk" value="admin@traqr.co.uk" />
+          </div>
+          <div>
+            <label for="password" class="block text-sm font-medium text-ink-700">Password</label>
+            <input type="password" id="password" name="password" required class="mt-1 block w-full rounded-lg border border-ink-300 px-4 py-2.5 text-ink-900 shadow-sm focus:border-traqr-500 focus:ring-1 focus:ring-traqr-500" placeholder="demo123" />
+          </div>
+          <button type="submit" id="submit-btn" class="btn-primary w-full">Log in</button>
+        </form>
+        <p class="mt-4 text-xs text-ink-500">Demo: <strong>admin@traqr.co.uk</strong> / <strong>demo123</strong></p>
+      </div>
+    </div>
+  </main>
+  <script>
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const msg = document.getElementById('message');
+      const btn = document.getElementById('submit-btn');
+      msg.classList.add('hidden');
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, password })
+        });
+        const data = await res.json();
+        msg.classList.remove('hidden');
+        if (data.ok) {
+          msg.className = 'mt-4 rounded-lg border border-traqr-200 bg-traqr-50 px-4 py-3 text-sm text-traqr-800';
+          msg.textContent = 'Logged in as ' + (data.display_name || email) + '. (Portal dashboard coming soon.)';
+        } else {
+          msg.className = 'mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800';
+          msg.textContent = data.message || 'Login failed';
+        }
+      } catch (err) {
+        msg.classList.remove('hidden');
+        msg.className = 'mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800';
+        msg.textContent = 'Network error. Is the database running?';
+      }
+      btn.disabled = false;
+    });
+  </script>
+</body>
+</html>

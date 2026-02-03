@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pricing — Traqr Cloud</title>
+  <meta name="description" content="Traqr POS pricing: devices and optional cloud sync add-on." />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="/css/output.css" rel="stylesheet" />
+</head>
+<body class="min-h-screen flex flex-col">
+  <header class="sticky top-0 z-50 border-b border-ink-200/80 bg-white/95 backdrop-blur supports-[backdrop-filter]:bg-white/80">
+    <nav class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8" aria-label="Main">
+      <a href="/" class="font-display text-xl font-bold tracking-tight text-ink-900">Traqr <span class="text-traqr-600">Cloud</span></a>
+      <div class="flex items-center gap-6">
+        <a href="/" class="text-sm font-medium text-ink-600 hover:text-ink-900">Product</a>
+        <a href="/pricing.html" class="text-sm font-medium text-ink-900">Pricing</a>
+        <a href="/devices.html" class="text-sm font-medium text-ink-600 hover:text-ink-900">Devices</a>
+        <a href="/contact.html" class="text-sm font-medium text-ink-600 hover:text-ink-900">Contact</a>
+        <a href="/login.html" class="btn-primary text-sm">Log in</a>
+      </div>
+    </nav>
+  </header>
+
+  <main class="flex-1">
+    <section class="px-4 py-16 sm:px-6 sm:py-20 lg:px-8">
+      <div class="mx-auto max-w-4xl text-center">
+        <h1 class="section-heading">Pricing</h1>
+        <p class="mt-4 text-lg text-ink-600">Traqr POS runs on your hardware. Add cloud sync when you need reporting and control.</p>
+      </div>
+
+      <div class="mx-auto mt-16 grid max-w-5xl gap-8 sm:grid-cols-2">
+        <div class="card border-traqr-200 bg-traqr-50/50">
+          <h2 class="font-display text-xl font-semibold text-ink-900">Traqr POS (device)</h2>
+          <p class="mt-2 text-sm text-ink-600">One-off purchase. Offline-first till, no subscription required.</p>
+          <p class="mt-6 font-display text-3xl font-bold text-ink-900">Device price</p>
+          <p class="text-sm text-ink-500">Varies by hardware — see <a href="/devices.html" class="text-traqr-600 hover:underline">Devices</a>.</p>
+          <ul class="mt-6 space-y-3 text-sm text-ink-700">
+            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Offline-first POS</li>
+            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Menus, orders, payments, receipts</li>
+            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Local staff & roles</li>
+            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> No ongoing fee to run the till</li>
+          </ul>
+          <a href="/devices.html" class="mt-8 inline-block btn-primary w-full sm:w-auto text-center">Browse devices</a>
+        </div>
+
+        <div class="card border-traqr-300 ring-2 ring-traqr-500/20">
+          <div class="flex items-center gap-2">
+            <span class="rounded-full bg-traqr-100 px-2.5 py-0.5 text-xs font-medium text-traqr-700">Add-on</span>
+          </div>
+          <h2 class="mt-2 font-display text-xl font-semibold text-ink-900">Cloud sync</h2>
+          <p class="mt-2 text-sm text-ink-600">Optional. Sync events to cloud, receive commands, reporting & approvals.</p>
+          <p class="mt-6 font-display text-3xl font-bold text-ink-900">Per device / month</p>
+          <p class="text-sm text-ink-500">Contact for volume and org pricing.</p>
+          <ul class="mt-6 space-y-3 text-sm text-ink-700">
+            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Events up (orders, transactions)</li>
+            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Commands down (refund, void, menu publish)</li>
+            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Two-person approval for sensitive actions</li>
+            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Org / franchise / store management</li>
+          </ul>
+          <a href="/contact.html" class="mt-8 inline-block btn-primary w-full sm:w-auto text-center">Contact sales</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="border-t border-ink-200 bg-white px-4 py-12 sm:px-6 lg:px-8">
+    <div class="mx-auto max-w-6xl">
+      <div class="flex flex-col items-center justify-between gap-6 sm:flex-row">
+        <a href="/" class="font-display text-lg font-bold text-ink-900">Traqr <span class="text-traqr-600">Cloud</span></a>
+        <div class="flex gap-8">
+          <a href="/pricing.html" class="text-sm text-ink-500 hover:text-ink-900">Pricing</a>
+          <a href="/devices.html" class="text-sm text-ink-500 hover:text-ink-900">Devices</a>
+          <a href="/contact.html" class="text-sm text-ink-500 hover:text-ink-900">Contact</a>
+        </div>
+      </div>
+      <p class="mt-8 text-center text-sm text-ink-500 sm:text-left">cloud.traqr.co.uk</p>
+    </div>
+  </footer>
+</body>
+</html>

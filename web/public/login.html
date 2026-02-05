@@ -12,7 +12,10 @@
 <body class="min-h-screen flex flex-col bg-ink-100">
   <header class="border-b border-ink-200 bg-white">
     <nav class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-      <a href="/" class="font-display text-xl font-bold tracking-tight text-ink-900">Traqr <span class="text-traqr-600">Cloud</span></a>
+      <a href="/" class="inline-flex items-center gap-2 text-ink-900">
+        <img src="/traqr.png" alt="Traqr" class="h-8 w-auto" />
+        <span class="text-sm font-medium text-ink-600">Cloud</span>
+      </a>
       <a href="/" class="text-sm font-medium text-ink-600 hover:text-ink-900">Back to home</a>
     </nav>
   </header>
@@ -57,7 +60,15 @@
         msg.classList.remove('hidden');
         if (data.ok) {
           msg.className = 'mt-4 rounded-lg border border-traqr-200 bg-traqr-50 px-4 py-3 text-sm text-traqr-800';
-          msg.textContent = 'Logged in as ' + (data.display_name || email) + '. (Portal dashboard coming soon.)';
+          msg.textContent = 'Logged in as ' + (data.display_name || email) + '. Redirecting to dashboard…';
+          try {
+            if (data.display_name) window.localStorage.setItem('traqr_display_name', data.display_name);
+            if (data.user_id) window.localStorage.setItem('traqr_user_id', data.user_id);
+            if (data.role) window.localStorage.setItem('traqr_role', data.role);
+          } catch (_) {}
+          setTimeout(() => {
+            window.location.href = '/dashboard';
+          }, 600);
         } else {
           msg.className = 'mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800';
           msg.textContent = data.message || 'Login failed';

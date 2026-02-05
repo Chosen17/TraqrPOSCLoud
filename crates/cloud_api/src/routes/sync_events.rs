@@ -5,7 +5,8 @@ use axum::{
     Json, Router,
 };
 use db::{
-    insert_event_idempotent, update_device_sync_state_ack_seq, validate_device_token,
+    has_active_entitlement, insert_event_idempotent, project_event_to_read_model,
+    project_event_to_orders, update_device_sync_state_ack_seq, validate_device_token,
 };
 use domain::{SyncEventsRequest, SyncEventsResponse};
 
@@ -41,6 +42,17 @@ async fn sync_events(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or_else(|| (StatusCode::UNAUTHORIZED, "invalid or revoked device token".to_string()))?;
+
+    // Enforce Cloud Sync entitlement at org level before accepting events.
+    let cloud_sync_ok = has_active_entitlement(db, identity.org_id, "cloud_sync")
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !cloud_sync_ok {
+        return Err((
+            StatusCode::FORBIDDEN,
+            serde_json::json!({ "error": "Cloud sync not enabled for this organization" }).to_string(),
+        ));
+    }
     let mut ack_seq = req.last_ack_seq;
 
     for e in &req.events {
@@ -54,7 +66,7 @@ async fn sync_events(
             }
         };
 
-        insert_event_idempotent(
+        let inserted = insert_event_idempotent(
             db,
             identity.org_id,
             identity.store_id,
@@ -67,6 +79,32 @@ async fn sync_events(
         )
         .await
         .map_err(|err| (StatusCode::INTERNAL_SERVER_ERROR, err.to_string()))?;
+
+        if inserted {
+            if let Err(err) = project_event_to_read_model(
+                db,
+                identity.org_id,
+                identity.store_id,
+                identity.device_id,
+                &e.event_type,
+                &e.event_body,
+                occurred_at,
+            )
+            .await
+            {
+                tracing::warn!("read model projection failed for {}: {}", e.event_type, err);
+            }
+            let _ = project_event_to_orders(
+                db,
+                identity.org_id,
+                identity.store_id,
+                identity.device_id,
+                &e.event_type,
+                &e.event_body,
+                occurred_at,
+            )
+            .await;
+        }
 
         if let Some(seq) = e.seq {
             ack_seq = Some(match ack_seq {

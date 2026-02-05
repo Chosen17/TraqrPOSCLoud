@@ -18,3 +18,7 @@ web/public/css/output.css
 
 # Debug
 *.log
+
+# User uploads (avatars, blog images) — keep directory, don't commit contents
+uploads/*
+!uploads/.gitkeep

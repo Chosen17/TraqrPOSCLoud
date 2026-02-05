@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Super Admin — Traqr Cloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="/css/output.css" rel="stylesheet" />
+</head>
+<body class="min-h-screen bg-ink-100">
+  <div class="flex min-h-screen">
+    <!-- Super Admin sidebar: always visible for this account -->
+    <aside class="flex w-64 shrink-0 flex-col border-r border-ink-200 bg-white px-4 py-6 shadow-sm">
+      <a href="/" class="mb-8 inline-flex items-center gap-2 text-ink-900">
+        <img src="/traqr.png" alt="Traqr" class="h-8 w-auto" />
+        <span class="text-sm font-medium text-ink-600">Cloud</span>
+      </a>
+      <nav class="space-y-1 text-sm">
+        <div class="text-xs font-semibold uppercase tracking-wide text-ink-500">Super Admin</div>
+        <a href="/super-admin" class="mt-1 flex items-center justify-between rounded-lg bg-ink-900 px-3 py-2 font-medium text-white">
+          <span>All customers</span>
+        </a>
+      </nav>
+      <div class="mt-auto pt-6 text-xs text-ink-500">
+        <a href="/profile" class="block text-ink-500 hover:text-ink-800">My profile</a>
+        <a href="/dashboard" class="mt-1 block text-ink-500 hover:text-ink-800">← Back to portal</a>
+        <span class="mt-2 block">Logged in as <span id="user-name">Demo Admin</span></span>
+      </div>
+    </aside>
+    <div id="sa-overlay" class="fixed inset-0 z-30 hidden bg-black/50 sm:hidden" aria-hidden="true"></div>
+
+    <!-- Main -->
+    <main class="flex-1 min-w-0">
+      <!-- Top bar (mobile) -->
+      <header class="flex items-center justify-between border-b border-ink-200 bg-white px-4 py-3 sm:hidden">
+        <div class="flex items-center gap-3">
+          <button type="button" id="sa-menu-btn" class="rounded p-2 text-ink-600 hover:bg-ink-100" aria-label="Open menu" title="Open menu">&#9776;</button>
+          <a href="/" class="inline-flex items-center gap-2 text-ink-900">
+            <img src="/traqr.png" alt="Traqr" class="h-7 w-auto" />
+            <span class="text-sm font-medium text-ink-600">Cloud</span>
+          </a>
+        </div>
+        <div class="text-xs text-ink-500">
+          <span id="user-name-mobile">Demo Admin</span>
+        </div>
+      </header>
+
+      <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <header class="flex items-center justify-between gap-4">
+          <div>
+            <h1 class="font-display text-2xl font-bold text-ink-900">Customer management</h1>
+            <p class="mt-1 text-sm text-ink-600">
+              Create customers, then manage them: view all stores, devices, entitlements, and grant Cloud Sync from the portal.
+            </p>
+          </div>
+          <button id="refresh-btn" class="btn-secondary text-xs">Refresh</button>
+        </header>
+
+        <!-- Create customer + first store + activation code -->
+        <section class="mt-6">
+          <div class="card">
+            <h2 class="text-sm font-semibold text-ink-900">Create a new customer and store</h2>
+            <p class="mt-1 text-xs text-ink-600">
+              Add an organization and its first store, then get an activation code. Give the code to the customer so they can enter it on their till (Settings → Cloud).
+            </p>
+            <form id="create-customer-form" class="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+              <div>
+                <label for="org_name" class="block text-xs font-medium text-ink-700">Customer or company name</label>
+                <input type="text" id="org_name" name="org_name" required
+                  class="mt-0.5 block w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm text-ink-900"
+                  placeholder="e.g. Acme Coffee" />
+              </div>
+              <div>
+                <label for="org_slug" class="block text-xs font-medium text-ink-700">Short ID (no spaces)</label>
+                <input type="text" id="org_slug" name="org_slug" required
+                  class="mt-0.5 block w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm text-ink-900"
+                  placeholder="e.g. acme-coffee" />
+              </div>
+              <div>
+                <label for="store_name" class="block text-xs font-medium text-ink-700">Store name</label>
+                <input type="text" id="store_name" name="store_name" required
+                  class="mt-0.5 block w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm text-ink-900"
+                  placeholder="e.g. Main Street" />
+              </div>
+              <div class="flex items-end">
+                <label class="flex items-center gap-2 text-xs text-ink-700">
+                  <input type="checkbox" id="grant_cloud_sync" name="grant_cloud_sync" checked />
+                  Enable Cloud Sync for this customer
+                </label>
+              </div>
+              <div class="sm:col-span-2 lg:col-span-4">
+                <button type="submit" id="create-customer-btn" class="btn-primary text-sm">
+                  Create &amp; get activation code
+                </button>
+              </div>
+            </form>
+            <div id="create-customer-result" class="mt-4 hidden rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm">
+              <p class="font-medium text-emerald-900">Customer and store created</p>
+              <p class="mt-2 text-xs text-emerald-800">Give this code to the customer. They enter it once on the till (Settings → Cloud). You won’t see it again.</p>
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <code id="result-activation-key" class="block rounded bg-white px-2 py-1 font-mono text-sm text-ink-900"></code>
+                <button type="button" id="copy-key-btn" class="btn-secondary text-xs">Copy code</button>
+              </div>
+              <p class="mt-2 text-xs text-emerald-800">Go to:</p>
+              <ul class="mt-1 list-inside list-disc text-xs">
+                <li><a id="result-org-link" href="#" class="text-traqr-600 underline">View organizations</a></li>
+                <li><a id="result-store-link" href="#" class="text-traqr-600 underline">Open this store</a></li>
+              </ul>
+              <p id="result-cloud-sync" class="mt-1 text-xs text-emerald-800"></p>
+            </div>
+            <div id="create-customer-error" class="mt-4 hidden rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"></div>
+          </div>
+        </section>
+
+        <section class="mt-6">
+          <div class="card">
+            <h2 class="text-sm font-semibold text-ink-900">All customers</h2>
+            <p class="mt-1 text-xs text-ink-600">
+              Click &quot;Manage&quot; to open the customer in the portal: view their stores, grant Cloud Sync, open any store to see devices, menus, orders, and commands.
+            </p>
+            <div class="mt-3 overflow-hidden rounded-xl border border-ink-200 bg-white">
+              <table class="min-w-full divide-y divide-ink-100 text-xs">
+                <thead class="bg-ink-50 text-ink-500">
+                  <tr>
+                    <th class="px-3 py-1 text-left font-medium">Customer</th>
+                    <th class="px-3 py-1 text-left font-medium">Slug</th>
+                    <th class="px-3 py-1 text-right font-medium">Stores</th>
+                    <th class="px-3 py-1 text-right font-medium">Devices</th>
+                    <th class="px-3 py-1 text-left font-medium">Cloud Sync</th>
+                    <th class="px-3 py-1 text-left font-medium">Created</th>
+                    <th class="px-3 py-1 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="super-orgs-body" class="divide-y divide-ink-100 bg-white"></tbody>
+              </table>
+              <p id="super-orgs-empty" class="px-3 py-4 text-center text-xs text-ink-500">
+                No customers yet. Use the form above to create one and get an activation code, then click Refresh.
+              </p>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function setUserName(name) {
+      document.getElementById('user-name').textContent = name;
+      document.getElementById('user-name-mobile').textContent = name;
+    }
+
+    function formatFriendlyDateTime(value) {
+      if (!value) return '–';
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return value;
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+      if (day.getTime() === today.getTime()) return 'Today ' + time;
+      if (day.getTime() === yesterday.getTime()) return 'Yesterday ' + time;
+      return dateStr + ', ' + time;
+    }
+
+    async function loadOrgs() {
+      const res = await fetch('/api/portal/super/orgs');
+      if (!res.ok) throw new Error('Failed to load organizations');
+      const data = await res.json();
+      const orgs = data.organizations || [];
+      const body = document.getElementById('super-orgs-body');
+      const empty = document.getElementById('super-orgs-empty');
+      body.innerHTML = '';
+      if (orgs.length === 0) {
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      for (const o of orgs) {
+        const tr = document.createElement('tr');
+        const manageUrl = '/super-admin-customer?org_id=' + encodeURIComponent(o.id);
+        tr.innerHTML = `
+          <td class="px-3 py-2 align-top text-ink-800">${o.name}</td>
+          <td class="px-3 py-2 align-top text-xs text-ink-500">${o.slug || '—'}</td>
+          <td class="px-3 py-2 align-top text-right text-ink-800">${o.store_count}</td>
+          <td class="px-3 py-2 align-top text-right text-ink-800">${o.device_count}</td>
+          <td class="px-3 py-2 align-top text-xs">
+            <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+              o.cloud_sync_active
+                ? 'bg-emerald-50 text-emerald-700'
+                : 'bg-ink-50 text-ink-600'
+            }">${o.cloud_sync_active ? 'Active' : 'Inactive'}</span>
+          </td>
+          <td class="px-3 py-2 align-top text-xs text-ink-500">${formatFriendlyDateTime(o.created_at)}</td>
+          <td class="px-3 py-2 align-top text-right">
+            <a href="${manageUrl}" class="inline-flex items-center rounded-lg bg-ink-900 px-2 py-1 text-[11px] font-medium text-white hover:bg-ink-800">Manage</a>
+          </td>
+        `;
+        body.appendChild(tr);
+      }
+    }
+
+    async function createCustomer(e) {
+      e.preventDefault();
+      const btn = document.getElementById('create-customer-btn');
+      const resultEl = document.getElementById('create-customer-result');
+      const errorEl = document.getElementById('create-customer-error');
+      resultEl.classList.add('hidden');
+      errorEl.classList.add('hidden');
+      const orgName = document.getElementById('org_name').value.trim();
+      const orgSlug = document.getElementById('org_slug').value.trim();
+      const storeName = document.getElementById('store_name').value.trim();
+      const grantCloudSync = document.getElementById('grant_cloud_sync').checked;
+      if (!orgName || !orgSlug || !storeName) {
+        errorEl.textContent = 'Please fill organization name, org slug, and store name.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+      btn.disabled = true;
+      try {
+        const res = await fetch('/api/portal/super/create-customer', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            org_name: orgName,
+            org_slug: orgSlug,
+            store_name: storeName,
+            grant_cloud_sync: grantCloudSync,
+          }),
+        });
+        const contentType = res.headers.get('content-type') || '';
+        let errMsg = res.statusText;
+        if (!res.ok) {
+          if (contentType.includes('application/json')) {
+            const data = await res.json().catch(() => ({}));
+            errMsg = data.detail || data.message || errMsg;
+          } else {
+            errMsg = await res.text().catch(() => errMsg) || errMsg;
+          }
+          errorEl.textContent = errMsg;
+          errorEl.classList.remove('hidden');
+          return;
+        }
+        const data = await res.json();
+        document.getElementById('result-activation-key').textContent = data.activation_key;
+        document.getElementById('result-org-link').href = '/organizations.html';
+        document.getElementById('result-org-link').textContent = 'Organizations';
+        document.getElementById('result-store-link').href = '/store.html?store_id=' + encodeURIComponent(data.store_id);
+        document.getElementById('result-store-link').textContent = 'Open store';
+        document.getElementById('result-cloud-sync').textContent = data.cloud_sync_granted
+          ? 'Cloud Sync is enabled for this customer.'
+          : 'Cloud Sync was not enabled. You can grant it later from the organization page.';
+        resultEl.classList.remove('hidden');
+        document.getElementById('copy-key-btn').onclick = function () {
+          const code = document.getElementById('result-activation-key').textContent;
+          navigator.clipboard.writeText(code).then(function () { alert('Activation code copied to clipboard.'); }).catch(function () { alert('Copy failed. Select and copy the code by hand.'); });
+        };
+        await loadOrgs();
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    async function init() {
+      try {
+        const storedName = window.localStorage.getItem('traqr_display_name');
+        if (storedName) setUserName(storedName);
+      } catch (_) {}
+      document.getElementById('refresh-btn').addEventListener('click', () => {
+        loadOrgs().catch(err => {
+          console.error(err);
+          alert('Failed to refresh organizations. Check API logs.');
+        });
+      });
+      document.getElementById('create-customer-form').addEventListener('submit', createCustomer);
+      await loadOrgs();
+    }
+
+    init().catch(err => console.error(err));
+
+    (function saSidebarMobile() {
+      var btn = document.getElementById('sa-menu-btn');
+      var sidebar = document.getElementById('sa-sidebar');
+      var overlay = document.getElementById('sa-overlay');
+      if (!btn || !sidebar || !overlay) return;
+      function open() {
+        sidebar.classList.remove('-translate-x-full');
+        sidebar.classList.add('translate-x-0');
+        overlay.classList.remove('hidden');
+      }
+      function close() {
+        sidebar.classList.add('-translate-x-full');
+        sidebar.classList.remove('translate-x-0');
+        overlay.classList.add('hidden');
+      }
+      btn.addEventListener('click', function () { sidebar.classList.contains('-translate-x-full') ? open() : close(); });
+      overlay.addEventListener('click', close);
+    })();
+  </script>
+</body>
+</html>
+

@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Customer account — Super Admin — Traqr Cloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="/css/output.css" rel="stylesheet" />
+</head>
+<body class="min-h-screen bg-ink-100">
+  <div class="flex min-h-screen">
+    <!-- Super Admin sidebar: always visible on desktop; toggleable on mobile -->
+    <aside id="sa-sidebar" class="fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-ink-200 bg-white px-4 py-6 shadow-sm transition-transform duration-200 -translate-x-full sm:relative sm:translate-x-0" aria-label="Super Admin menu">
+      <a href="/" class="mb-8 inline-flex items-center gap-2 text-ink-900">
+        <img src="/traqr.png" alt="Traqr" class="h-8 w-auto" />
+        <span class="text-sm font-medium text-ink-600">Cloud</span>
+      </a>
+      <nav class="space-y-1 text-sm">
+        <div class="text-xs font-semibold uppercase tracking-wide text-ink-500">Super Admin</div>
+        <a href="/super-admin" class="mt-1 block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">All customers</a>
+      </nav>
+      <div class="mt-auto pt-6 text-xs text-ink-500">
+        <a href="/profile" class="block text-ink-500 hover:text-ink-800">My profile</a>
+        <a href="/dashboard" class="mt-1 block text-ink-500 hover:text-ink-800">← Back to portal</a>
+        <span class="mt-2 block">Logged in as <span id="user-name">Demo Admin</span></span>
+      </div>
+    </aside>
+    <div id="sa-overlay" class="fixed inset-0 z-30 hidden bg-black/50 sm:hidden" aria-hidden="true"></div>
+
+    <main class="flex-1 min-w-0">
+      <header class="flex items-center justify-between border-b border-ink-200 bg-white px-4 py-3 sm:hidden">
+        <div class="flex items-center gap-3">
+          <button type="button" id="sa-menu-btn" class="rounded p-2 text-ink-600 hover:bg-ink-100" aria-label="Open menu" title="Open menu">&#9776;</button>
+          <a href="/" class="inline-flex items-center gap-2 text-ink-900"><img src="/traqr.png" alt="Traqr" class="h-7 w-auto" /><span class="text-sm font-medium text-ink-600">Cloud</span></a>
+        </div>
+        <span id="user-name-mobile" class="text-xs text-ink-500">Demo Admin</span>
+      </header>
+
+      <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <p id="customer-breadcrumb" class="text-xs text-ink-500">
+          <a href="/super-admin" class="hover:text-ink-800">All customers</a>
+          <span>/</span>
+          <span id="customer-name-breadcrumb">Customer</span>
+        </p>
+        <div class="mt-2 flex flex-wrap items-center justify-between gap-4">
+          <h1 id="customer-title" class="font-display text-2xl font-bold text-ink-900">Customer account</h1>
+          <a id="open-in-portal-btn" href="#" class="btn-secondary text-xs">Open in portal</a>
+        </div>
+        <p id="customer-meta" class="mt-1 text-sm text-ink-600">Loading…</p>
+
+        <div id="customer-error" class="mt-6 hidden rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-800"></div>
+        <div id="customer-content" class="mt-6 hidden space-y-6">
+          <!-- Account status: suspend / reactivate (Cloud Sync stops when suspended) -->
+          <div class="card flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 class="text-sm font-semibold text-ink-900">Account</h2>
+              <p id="cloud-sync-status" class="mt-0.5 text-xs text-ink-600">—</p>
+              <p class="mt-0.5 text-[11px] text-ink-500">When suspended, Cloud Sync is disabled until you reactivate.</p>
+            </div>
+            <div class="flex flex-wrap gap-2">
+              <button id="suspend-btn" type="button" class="btn-secondary text-xs hidden">Suspend account</button>
+              <button id="reactivate-btn" type="button" class="btn-primary text-xs hidden">Reactivate account</button>
+              <button id="grant-cloud-sync-btn" type="button" class="btn-primary text-xs hidden">Grant Cloud Sync</button>
+            </div>
+          </div>
+
+          <!-- Entitlements -->
+          <div class="card">
+            <h2 class="text-sm font-semibold text-ink-900">Entitlements</h2>
+            <div class="mt-3 overflow-hidden rounded-xl border border-ink-100">
+              <table class="min-w-full divide-y divide-ink-100 text-xs">
+                <thead class="bg-ink-50 text-ink-500">
+                  <tr>
+                    <th class="px-3 py-1 text-left font-medium">Plan</th>
+                    <th class="px-3 py-1 text-left font-medium">Valid from</th>
+                    <th class="px-3 py-1 text-left font-medium">Valid until</th>
+                    <th class="px-3 py-1 text-right font-medium">Cloud Sync</th>
+                  </tr>
+                </thead>
+                <tbody id="entitlements-body" class="divide-y divide-ink-100 bg-white"></tbody>
+              </table>
+              <p id="entitlements-empty" class="px-3 py-4 text-center text-xs text-ink-500 hidden">No entitlements.</p>
+            </div>
+          </div>
+
+          <!-- Stores -->
+          <div class="card">
+            <h2 class="text-sm font-semibold text-ink-900">Stores</h2>
+            <p class="mt-0.5 text-xs text-ink-600">Open a store to view devices, menu, orders, and create activation codes.</p>
+            <div class="mt-3 overflow-hidden rounded-xl border border-ink-100">
+              <table class="min-w-full divide-y divide-ink-100 text-xs">
+                <thead class="bg-ink-50 text-ink-500">
+                  <tr>
+                    <th class="px-3 py-1 text-left font-medium">Store</th>
+                    <th class="px-3 py-1 text-left font-medium">ID</th>
+                    <th class="px-3 py-1 text-right font-medium">Devices</th>
+                    <th class="px-3 py-1 text-left font-medium">Last activity</th>
+                    <th class="px-3 py-1 text-right font-medium">Actions</th>
+                  </tr>
+                </thead>
+                <tbody id="stores-body" class="divide-y divide-ink-100 bg-white"></tbody>
+              </table>
+              <p id="stores-empty" class="px-3 py-4 text-center text-xs text-ink-500 hidden">No stores.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function setUserName(name) {
+      const els = document.querySelectorAll('#user-name, #user-name-mobile');
+      els.forEach(el => { if (el) el.textContent = name; });
+    }
+    function shortId(uuid) {
+      if (!uuid || typeof uuid !== 'string') return '—';
+      return uuid.replace(/-/g, '').slice(0, 8);
+    }
+    function formatFriendlyDateTime(v) {
+      if (!v) return '–';
+      const d = new Date(v);
+      if (isNaN(d.getTime())) return v;
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+      if (day.getTime() === today.getTime()) return 'Today ' + time;
+      if (day.getTime() === yesterday.getTime()) return 'Yesterday ' + time;
+      return dateStr + ', ' + time;
+    }
+
+    function getOrgId() {
+      return new URLSearchParams(window.location.search).get('org_id') || '';
+    }
+
+    async function loadCustomer() {
+      const orgId = getOrgId();
+      const errorEl = document.getElementById('customer-error');
+      const contentEl = document.getElementById('customer-content');
+      errorEl.classList.add('hidden');
+      contentEl.classList.add('hidden');
+      if (!orgId) {
+        errorEl.textContent = 'Missing org_id in URL. Go to All customers and click Manage on a customer.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+      const res = await fetch('/api/portal/orgs/' + encodeURIComponent(orgId));
+      if (!res.ok) {
+        errorEl.textContent = res.status === 404 ? 'Customer not found.' : 'Failed to load customer.';
+        errorEl.classList.remove('hidden');
+        return;
+      }
+      const data = await res.json();
+      contentEl.classList.remove('hidden');
+
+      const name = data.name || 'Customer';
+      document.title = name + ' — Super Admin — Traqr Cloud';
+      document.getElementById('customer-name-breadcrumb').textContent = name;
+      document.getElementById('customer-title').textContent = name;
+      document.getElementById('customer-meta').textContent =
+        'Slug: ' + (data.slug || '—') + ' · Created ' + formatFriendlyDateTime(data.created_at);
+      document.getElementById('open-in-portal-btn').href = '/organizations?org_id=' + encodeURIComponent(data.id);
+
+      const hasCloudSync = (data.entitlements || []).some(e => {
+        if (e.plan_code !== 'cloud_sync' || !e.cloud_sync_add_on) return false;
+        if (!e.valid_until) return true;
+        return new Date(e.valid_until) > new Date();
+      });
+      const statusEl = document.getElementById('cloud-sync-status');
+      statusEl.textContent = hasCloudSync ? 'Active' : 'Suspended';
+      statusEl.className = hasCloudSync ? 'mt-0.5 text-xs text-emerald-700' : 'mt-0.5 text-xs text-amber-700';
+      document.getElementById('suspend-btn').classList.toggle('hidden', !hasCloudSync);
+      document.getElementById('reactivate-btn').classList.toggle('hidden', hasCloudSync);
+      document.getElementById('grant-cloud-sync-btn').classList.add('hidden');
+      window.currentOrgId = data.id;
+
+      const entBody = document.getElementById('entitlements-body');
+      const entEmpty = document.getElementById('entitlements-empty');
+      entBody.innerHTML = '';
+      const ents = data.entitlements || [];
+      if (ents.length === 0) {
+        entEmpty.classList.remove('hidden');
+      } else {
+        entEmpty.classList.add('hidden');
+        ents.forEach(e => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="px-3 py-2 text-ink-800">${e.plan_name} <span class="text-ink-500">(${e.plan_code})</span></td>
+            <td class="px-3 py-2 text-ink-600">${formatFriendlyDateTime(e.valid_from)}</td>
+            <td class="px-3 py-2 text-ink-600">${e.valid_until ? formatFriendlyDateTime(e.valid_until) : 'Open-ended'}</td>
+            <td class="px-3 py-2 text-right">${e.cloud_sync_add_on ? '<span class="text-emerald-600">Yes</span>' : '—'}</td>
+          `;
+          entBody.appendChild(tr);
+        });
+      }
+
+      const storesBody = document.getElementById('stores-body');
+      const storesEmpty = document.getElementById('stores-empty');
+      storesBody.innerHTML = '';
+      const stores = data.stores || [];
+      if (stores.length === 0) {
+        storesEmpty.classList.remove('hidden');
+      } else {
+        storesEmpty.classList.add('hidden');
+        stores.forEach(s => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="px-3 py-2 font-medium text-ink-800">${s.name}</td>
+            <td class="px-3 py-2 font-mono text-[11px] text-ink-500" title="${(s.id || '').replace(/"/g, '&quot;')}">${shortId(s.id)}</td>
+            <td class="px-3 py-2 text-right text-ink-800">${s.device_count}</td>
+            <td class="px-3 py-2 text-ink-500">${formatFriendlyDateTime(s.last_event_at)}</td>
+            <td class="px-3 py-2 text-right">
+              <a href="/store?store_id=${encodeURIComponent(s.id)}" class="font-medium text-traqr-600 hover:text-traqr-500">Open store →</a>
+            </td>
+          `;
+          storesBody.appendChild(tr);
+        });
+      }
+    }
+
+    async function suspendAccount() {
+      if (!window.currentOrgId) return;
+      if (!confirm('Suspend this customer? Cloud Sync will stop until you reactivate.')) return;
+      try {
+        const res = await fetch('/api/portal/orgs/' + encodeURIComponent(window.currentOrgId) + '/suspend', { method: 'POST' });
+        if (!res.ok) {
+          const text = await res.text();
+          throw new Error(text || 'Failed');
+        }
+        await loadCustomer();
+      } catch (e) {
+        console.error(e);
+        alert(e.message || 'Failed to suspend. They may have no Cloud Sync entitlement.');
+      }
+    }
+
+    async function reactivateAccount() {
+      if (!window.currentOrgId) return;
+      if (!confirm('Reactivate this customer? Cloud Sync will work again.')) return;
+      try {
+        const res = await fetch('/api/portal/orgs/' + encodeURIComponent(window.currentOrgId) + '/reactivate', { method: 'POST' });
+        if (!res.ok) throw new Error(await res.text() || 'Failed');
+        await loadCustomer();
+      } catch (e) {
+        console.error(e);
+        alert('Failed to reactivate. Check API logs.');
+      }
+    }
+
+    (function init() {
+      try {
+        const n = window.localStorage.getItem('traqr_display_name');
+        if (n) setUserName(n);
+      } catch (_) {}
+      document.getElementById('suspend-btn').addEventListener('click', suspendAccount);
+      document.getElementById('reactivate-btn').addEventListener('click', reactivateAccount);
+      document.getElementById('grant-cloud-sync-btn').addEventListener('click', async function () {
+        if (!window.currentOrgId) return;
+        if (!confirm('Grant Cloud Sync for this customer?')) return;
+        try {
+          const res = await fetch('/api/portal/orgs/' + encodeURIComponent(window.currentOrgId) + '/entitlements/cloud_sync', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({})
+          });
+          if (!res.ok) throw new Error(await res.text() || 'Failed');
+          await loadCustomer();
+        } catch (e) {
+          console.error(e);
+          alert('Failed to grant Cloud Sync.');
+        }
+      });
+      loadCustomer();
+    })();
+
+    (function saSidebarMobile() {
+      var btn = document.getElementById('sa-menu-btn');
+      var sidebar = document.getElementById('sa-sidebar');
+      var overlay = document.getElementById('sa-overlay');
+      if (!btn || !sidebar || !overlay) return;
+      function open() {
+        sidebar.classList.remove('-translate-x-full');
+        sidebar.classList.add('translate-x-0');
+        overlay.classList.remove('hidden');
+      }
+      function close() {
+        sidebar.classList.add('-translate-x-full');
+        sidebar.classList.remove('translate-x-0');
+        overlay.classList.add('hidden');
+      }
+      btn.addEventListener('click', function () { sidebar.classList.contains('-translate-x-full') ? open() : close(); });
+      overlay.addEventListener('click', close);
+    })();
+  </script>
+</body>
+</html>

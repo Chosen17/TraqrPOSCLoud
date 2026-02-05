@@ -1,66 +1,80 @@
 -- Read model: mirrors POS orders/transactions/receipts for reporting and sync.
--- Populated from device_event_log (Phase 2).
-
 CREATE TABLE orders (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  store_id uuid NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  device_id uuid NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-  local_order_id text NOT NULL,
-  status text NOT NULL DEFAULT 'open',
-  total_cents bigint NULL,
-  occurred_at timestamptz NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(store_id, device_id, local_order_id)
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  org_id CHAR(36) NOT NULL,
+  store_id CHAR(36) NOT NULL,
+  device_id CHAR(36) NOT NULL,
+  local_order_id VARCHAR(255) NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'open',
+  total_cents BIGINT NULL,
+  occurred_at DATETIME(3) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3)),
+  UNIQUE KEY uq_orders_store_device_local (store_id, device_id, local_order_id),
+  FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
+  FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
 CREATE TABLE order_items (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  local_item_id text NULL,
-  product_ref text NULL,
-  quantity numeric NOT NULL DEFAULT 1,
-  unit_price_cents bigint NULL,
-  line_total_cents bigint NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  order_id CHAR(36) NOT NULL,
+  local_item_id VARCHAR(255) NULL,
+  product_ref VARCHAR(255) NULL,
+  quantity DECIMAL(18,4) NOT NULL DEFAULT 1,
+  unit_price_cents BIGINT NULL,
+  line_total_cents BIGINT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3)),
+  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
 
 CREATE TABLE transactions (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  store_id uuid NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  device_id uuid NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-  order_id uuid NULL REFERENCES orders(id) ON DELETE SET NULL,
-  local_transaction_id text NOT NULL,
-  kind text NOT NULL,
-  amount_cents bigint NOT NULL,
-  occurred_at timestamptz NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(store_id, device_id, local_transaction_id)
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  org_id CHAR(36) NOT NULL,
+  store_id CHAR(36) NOT NULL,
+  device_id CHAR(36) NOT NULL,
+  order_id CHAR(36) NULL,
+  local_transaction_id VARCHAR(255) NOT NULL,
+  kind VARCHAR(100) NOT NULL,
+  amount_cents BIGINT NOT NULL,
+  occurred_at DATETIME(3) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3)),
+  UNIQUE KEY uq_transactions_store_device_local (store_id, device_id, local_transaction_id),
+  FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
+  FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
+  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL
 );
 
 CREATE TABLE receipts (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  store_id uuid NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  device_id uuid NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-  order_id uuid NULL REFERENCES orders(id) ON DELETE SET NULL,
-  transaction_id uuid NULL REFERENCES transactions(id) ON DELETE SET NULL,
-  local_receipt_id text NOT NULL,
-  occurred_at timestamptz NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(store_id, device_id, local_receipt_id)
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  org_id CHAR(36) NOT NULL,
+  store_id CHAR(36) NOT NULL,
+  device_id CHAR(36) NOT NULL,
+  order_id CHAR(36) NULL,
+  transaction_id CHAR(36) NULL,
+  local_receipt_id VARCHAR(255) NOT NULL,
+  occurred_at DATETIME(3) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3)),
+  UNIQUE KEY uq_receipts_store_device_local (store_id, device_id, local_receipt_id),
+  FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
+  FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
+  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE SET NULL,
+  FOREIGN KEY (transaction_id) REFERENCES transactions(id) ON DELETE SET NULL
 );
 
 CREATE TABLE order_events (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  store_id uuid NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  order_id uuid NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-  event_type text NOT NULL,
-  event_body jsonb NULL,
-  occurred_at timestamptz NOT NULL,
-  created_at timestamptz NOT NULL DEFAULT now()
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  org_id CHAR(36) NOT NULL,
+  store_id CHAR(36) NOT NULL,
+  order_id CHAR(36) NOT NULL,
+  event_type VARCHAR(100) NOT NULL,
+  event_body JSON NULL,
+  occurred_at DATETIME(3) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3)),
+  FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
+  FOREIGN KEY (order_id) REFERENCES orders(id) ON DELETE CASCADE
 );
 
 CREATE INDEX idx_orders_org_store ON orders(org_id, store_id);

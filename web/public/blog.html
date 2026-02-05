@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Blog — Traqr Cloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="/css/output.css" rel="stylesheet" />
+</head>
+<body class="min-h-screen bg-ink-100">
+  <header class="border-b border-ink-200 bg-white">
+    <nav class="mx-auto flex max-w-4xl items-center justify-between gap-4 px-4 py-4">
+      <a href="/" class="inline-flex items-center gap-2 text-ink-900">
+        <img src="/traqr.png" alt="Traqr" class="h-7 w-auto" />
+        <span class="text-sm font-medium text-ink-600">Cloud</span>
+      </a>
+      <a href="/blog" class="text-sm text-ink-600 hover:text-ink-900">Blog</a>
+      <a href="/docs" class="text-sm text-ink-600 hover:text-ink-900">Docs</a>
+      <a href="/dashboard" class="text-sm text-ink-600 hover:text-ink-900">Dashboard</a>
+    </nav>
+  </header>
+  <main id="blog-main" class="mx-auto max-w-4xl px-4 py-8">
+    <p class="text-ink-500">Loading…</p>
+  </main>
+  <script>
+    const path = window.location.pathname.replace(/^\/blog\/?/, '') || '';
+    const slug = path && path !== 'new' ? path : null;
+    const isNew = path === 'new';
+
+    function escapeHtml(s) {
+      if (!s) return '';
+      const d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+
+    async function render() {
+      const main = document.getElementById('blog-main');
+      main.innerHTML = '<p class="text-ink-500">Loading…</p>';
+      try {
+        if (slug) {
+          const res = await fetch('/api/portal/blogs/by-slug/' + encodeURIComponent(slug));
+          if (!res.ok) { main.innerHTML = '<p class="text-ink-500">Post not found.</p>'; return; }
+          const post = await res.json();
+          document.title = post.title + ' — Blog — Traqr Cloud';
+          const featPath = (post.featured_image_path || '').replace(/^\//, '');
+          const featImg = featPath ? '<img src="/uploads/' + escapeHtml(featPath) + '" alt="" class="mt-4 w-full rounded-lg object-cover max-h-80" />' : '';
+          let bodyHtml = escapeHtml(post.body).replace(/\n/g, '<br>');
+          bodyHtml = bodyHtml.replace(/!\[image\]\(([^)]+)\)/g, function (_, url) { return '<img src="' + escapeHtml(url) + '" alt="" class="rounded-lg max-w-full my-2" />'; });
+          bodyHtml = bodyHtml.replace(/~~([\s\S]*?)~~/g, '<s>$1</s>');
+          main.innerHTML = '<article class="card"><h1 class="font-display text-2xl font-bold text-ink-900">' + escapeHtml(post.title) + '</h1><p class="mt-2 text-sm text-ink-500">' + (post.published_at ? new Date(post.published_at).toLocaleDateString() : 'Draft') + '</p>' + featImg + '<div class="mt-6 prose prose-ink max-w-none text-ink-700">' + bodyHtml + '</div></article>';
+        } else if (isNew) {
+          // Show form immediately so user can start creating; permission is checked on submit and optionally in background
+          const formHtml = '<div class="card"><h1 class="font-display text-xl font-bold text-ink-900">New post</h1><form id="new-post-form" class="mt-4 space-y-4"><div><label class="block text-xs font-medium text-ink-700">Title</label><input type="text" id="ptitle" required class="mt-0.5 block w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm" /></div><div><label class="block text-xs font-medium text-ink-700">Excerpt (optional)</label><input type="text" id="pexcerpt" class="mt-0.5 block w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm" /></div><div><label class="block text-xs font-medium text-ink-700">Featured image (optional)</label><div class="mt-0.5 flex items-center gap-2"><input type="file" id="pfeat" accept="image/jpeg,image/png,image/gif,image/webp" class="text-sm" /><span id="pfeat-status" class="text-xs text-ink-500"></span></div><input type="hidden" id="pfeat-path" value="" /></div><div><label class="block text-xs font-medium text-ink-700">Body</label><div class="flex gap-2"><button type="button" id="pbody-insert-img" class="btn-secondary text-xs">Insert image</button><input type="file" id="pbody-img-file" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" /></div><div class="format-toolbar mt-1 flex flex-wrap items-center gap-1 rounded-t-lg border border-ink-200 border-b-0 bg-ink-50 px-2 py-1" data-target="pbody"><button type="button" class="format-btn rounded px-2 py-1 text-sm font-bold hover:bg-ink-200" data-wrap-before="**" data-wrap-after="**" title="Bold">B</button><button type="button" class="format-btn rounded px-2 py-1 text-sm italic hover:bg-ink-200" data-wrap-before="*" data-wrap-after="*" title="Italic">I</button><button type="button" class="format-btn rounded px-2 py-1 text-sm hover:bg-ink-200" data-wrap-before="[" data-wrap-after="](url)" title="Link">Link</button><button type="button" class="format-btn rounded px-2 py-1 text-sm hover:bg-ink-200" data-line-prefix="## " title="Heading">H</button><button type="button" class="format-btn rounded px-2 py-1 text-sm font-mono hover:bg-ink-200" data-wrap-before="`" data-wrap-after="`" title="Code">Code</button><button type="button" class="format-btn rounded px-2 py-1 text-sm hover:bg-ink-200" data-line-prefix="- " title="Bullet list">•</button><button type="button" class="format-btn rounded px-2 py-1 text-sm hover:bg-ink-200" data-line-prefix="1. " title="Numbered list">1.</button><button type="button" class="format-btn rounded px-2 py-1 text-sm hover:bg-ink-200" data-line-prefix="> " title="Block quote">"</button><button type="button" class="format-btn rounded px-2 py-1 text-sm hover:bg-ink-200" data-wrap-before="~~" data-wrap-after="~~" title="Strikethrough">S</button></div><textarea id="pbody" rows="8" required class="mt-0 block w-full rounded-b-lg rounded-t-none border border-ink-200 border-t-0 px-2 py-1.5 text-sm"></textarea></div><div><label class="flex items-center gap-2"><input type="checkbox" id="ppublish" /> Publish now</label></div><button type="submit" class="btn-primary text-sm">Create post</button></form></div>';
+          main.innerHTML = formHtml;
+          (function () {
+            var featInput = document.getElementById('pfeat');
+            var featPath = document.getElementById('pfeat-path');
+            var featStatus = document.getElementById('pfeat-status');
+            featInput.addEventListener('change', function () {
+              if (!featInput.files || !featInput.files[0]) return;
+              featStatus.textContent = 'Uploading…';
+              var fd = new FormData();
+              fd.append('file', featInput.files[0]);
+              fetch('/api/portal/blogs/upload-image', { method: 'POST', credentials: 'include', body: fd })
+                .then(function (r) {
+                  if (!r.ok) return r.json().then(function (d) { throw new Error(d.message || d.detail || 'Upload failed'); });
+                  return r.json();
+                })
+                .then(function (d) {
+                  featPath.value = d.path || '';
+                  featStatus.textContent = d.path ? 'Uploaded' : 'No path returned';
+                })
+                .catch(function (err) { featStatus.textContent = err.message || 'Upload failed'; featPath.value = ''; });
+            });
+            var insertBtn = document.getElementById('pbody-insert-img');
+            var bodyFile = document.getElementById('pbody-img-file');
+            insertBtn.addEventListener('click', function () { bodyFile.click(); });
+            bodyFile.addEventListener('change', function () {
+              if (!bodyFile.files || !bodyFile.files[0]) return;
+              var fd = new FormData();
+              fd.append('file', bodyFile.files[0]);
+              fetch('/api/portal/blogs/upload-image', { method: 'POST', credentials: 'include', body: fd })
+                .then(function (r) {
+                  if (!r.ok) return r.json().then(function (d) { throw new Error(d.message || d.detail || 'Upload failed'); });
+                  return r.json();
+                })
+                .then(function (d) {
+                  var url = d.url || (d.path ? '/uploads/' + d.path : null);
+                  if (url) {
+                    var ta = document.getElementById('pbody');
+                    ta.value += (ta.value ? '\n\n' : '') + '![image](' + url + ')\n\n';
+                  }
+                })
+                .catch(function () { alert('Image upload failed. Make sure you are logged in as owner or manager.'); });
+              bodyFile.value = '';
+            });
+            (function initFormatToolbar() {
+              var toolbar = document.querySelector('.format-toolbar[data-target="pbody"]');
+              var ta = document.getElementById('pbody');
+              if (!toolbar || !ta) return;
+              function applyWrap(before, after) {
+                var start = ta.selectionStart, end = ta.selectionEnd, val = ta.value, sel = val.slice(start, end);
+                var newText = before + sel + after;
+                ta.value = val.slice(0, start) + newText + val.slice(end);
+                ta.setSelectionRange(start + before.length, start + before.length + sel.length);
+                ta.focus();
+              }
+              function applyLinePrefix(prefix) {
+                var start = ta.selectionStart, val = ta.value;
+                var lineStart = val.lastIndexOf('\n', start - 1) + 1;
+                ta.value = val.slice(0, lineStart) + prefix + val.slice(lineStart);
+                ta.setSelectionRange(lineStart + prefix.length, lineStart + prefix.length);
+                ta.focus();
+              }
+              toolbar.querySelectorAll('.format-btn').forEach(function (btn) {
+                btn.addEventListener('click', function () {
+                  var before = btn.getAttribute('data-wrap-before'), after = btn.getAttribute('data-wrap-after');
+                  var linePrefix = btn.getAttribute('data-line-prefix');
+                  if (before !== null && after !== null) {
+                    if (before === '[' && after === '](url)') {
+                      var s = ta.selectionStart, e = ta.selectionEnd, sel = ta.value.slice(s, e);
+                      var url = prompt('Link URL:', 'https://');
+                      if (url != null) { before = '['; after = '](' + url + ')'; applyWrap(before, after); }
+                    } else applyWrap(before, after);
+                  } else if (linePrefix) applyLinePrefix(linePrefix);
+                });
+              });
+            })();
+          })();
+          document.getElementById('new-post-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('ptitle').value.trim();
+            const featPathEl = document.getElementById('pfeat-path');
+            const r = await fetch('/api/portal/blogs', {
+              method: 'POST', credentials: 'include', headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title, slug: title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, ''), excerpt: document.getElementById('pexcerpt').value.trim() || null, body: document.getElementById('pbody').value, featured_image_path: featPathEl && featPathEl.value ? featPathEl.value : null, publish: document.getElementById('ppublish').checked })
+            });
+            if (r.ok) { const d = await r.json(); window.location.href = '/blog/' + d.slug; } else {
+              const err = await r.json().catch(() => ({}));
+              alert(err.message || err.detail || 'Failed to create post. You may need to log in or need owner/manager role.');
+            }
+          });
+          // Optionally check permission in background; if not allowed, replace with message
+          fetch('/api/auth/me', { credentials: 'include' })
+            .then(function (meRes) { return meRes.ok ? meRes.json() : {}; })
+            .then(function (me) {
+              const role = me && me.role;
+              if (role !== 'sa_owner' && role !== 'sa_manager') {
+                main.innerHTML = '<div class="card"><h1 class="font-display text-xl font-bold text-ink-900">New post</h1><p class="mt-2 text-sm text-ink-500">Only owner and manager can create blogs. <a href="/blog" class="text-traqr-600">Back to blog</a></p></div>';
+              }
+            })
+            .catch(function () { /* keep form; server will reject on submit if not allowed */ });
+          return;
+        } else {
+          const res = await fetch('/api/portal/blogs/public?limit=30');
+          if (!res.ok) {
+            main.innerHTML = '<div class="card"><p class="text-ink-600">Unable to load posts. Please try again later.</p><p class="mt-2 text-sm text-ink-500">If the problem persists, check that the server is running and the database is available.</p></div>';
+            return;
+          }
+          const data = await res.json();
+          const posts = Array.isArray(data) ? data : (data && data.posts) || [];
+          document.title = 'Blog — Traqr Cloud';
+          if (!posts.length) {
+            main.innerHTML = '<div class="card"><p class="text-ink-600">No posts yet.</p><p class="mt-2 text-sm text-ink-500"><a href="/blog/new" class="text-traqr-600 hover:underline">Create a post</a> (owner or manager only) or check back later.</p></div>';
+            return;
+          }
+          main.innerHTML = '<div class="space-y-4">' + posts.map(p => '<a href="/blog/' + escapeHtml(p.slug) + '" class="card block hover:border-traqr-300"><h2 class="font-display text-lg font-bold text-ink-900">' + escapeHtml(p.title) + '</h2><p class="mt-1 text-sm text-ink-500">' + (p.published_at ? new Date(p.published_at).toLocaleDateString() : '') + '</p></a>').join('') + '</div>';
+        }
+      } catch (err) {
+        console.error('Blog render error:', err);
+        main.innerHTML = '<div class="card"><p class="text-ink-600">Something went wrong loading this page.</p><p class="mt-2 text-sm text-ink-500">Try refreshing, or go to <a href="/dashboard" class="text-traqr-600">Dashboard</a>.</p></div>';
+      }
+    }
+    render();
+  </script>
+</body>
+</html>

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Organizations — Traqr Cloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="/css/output.css" rel="stylesheet" />
+</head>
+<body class="min-h-screen bg-ink-100">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="hidden w-64 flex-col border-r border-ink-200 bg-white/90 px-4 py-6 sm:flex">
+      <a href="/" class="mb-8 inline-flex items-center gap-2 text-ink-900">
+        <img src="/traqr.png" alt="Traqr" class="h-8 w-auto" />
+        <span class="text-sm font-medium text-ink-600">Cloud</span>
+      </a>
+      <nav class="space-y-1 text-sm">
+        <div class="text-xs font-semibold uppercase tracking-wide text-ink-500">Main</div>
+        <a href="/dashboard.html" class="mt-1 block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Overview</a>
+        <div class="mt-4 text-xs font-semibold uppercase tracking-wide text-ink-500">Operations</div>
+        <a href="/organizations" class="mt-1 flex items-center justify-between rounded-lg bg-ink-900 px-3 py-2 font-medium text-white">
+          <span>Organizations &amp; Stores</span>
+        </a>
+        <a href="/ops-devices" class="block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Devices &amp; Activation</a>
+        <a href="/ops-menus.html" class="block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Menus &amp; Availability</a>
+        <a href="/ops-orders" class="block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Orders &amp; Receipts</a>
+        <a href="/ops-commands" class="block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Command Center</a>
+      </nav>
+      <div class="mt-auto pt-6 text-xs text-ink-500">
+        Logged in as <span id="user-name">Demo Admin</span>
+      </div>
+    </aside>
+
+    <!-- Main content -->
+    <main class="flex-1">
+      <!-- Top bar (mobile) -->
+      <header class="flex items-center justify-between border-b border-ink-200 bg-white px-4 py-3 sm:hidden">
+        <div class="inline-flex items-center gap-2 text-ink-900">
+          <img src="/traqr.png" alt="Traqr" class="h-7 w-auto" />
+          <span class="text-sm font-medium text-ink-600">Cloud</span>
+        </div>
+        <div class="text-xs text-ink-500">
+          <span id="user-name-mobile">Demo Admin</span>
+        </div>
+      </header>
+
+      <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <!-- Summary strip -->
+        <div id="orgs-summary" class="mb-6 flex flex-wrap items-center gap-4 rounded-xl border border-ink-200 bg-white px-4 py-3 text-sm">
+          <span class="font-medium text-ink-900"><span id="summary-org-count">0</span> organizations</span>
+          <span class="text-ink-500">·</span>
+          <span class="text-ink-700"><span id="summary-store-count">0</span> stores</span>
+          <span class="text-ink-500">·</span>
+          <span class="text-ink-700"><span id="summary-sync-count">0</span> with Cloud Sync</span>
+        </div>
+
+        <div class="flex flex-col gap-6 lg:flex-row">
+          <!-- Orgs list -->
+          <section class="w-full lg:w-1/3">
+            <div class="flex items-center justify-between gap-2" id="section-orgs">
+              <div>
+                <h1 class="font-display text-xl font-bold text-ink-900">Organizations &amp; Stores</h1>
+                <p class="mt-1 text-xs text-ink-600" id="orgs-helper">
+                  Customers using Traqr POS. Select an organization to see entitlements and stores, then open a store to manage devices, menus, orders, and commands.
+                </p>
+              </div>
+              <button id="refresh-orgs-btn" class="btn-secondary text-xs">Refresh</button>
+            </div>
+            <div id="orgs-list" class="mt-4 space-y-2 overflow-hidden rounded-xl border border-ink-200 bg-white p-2 text-sm">
+              <!-- Filled by JS -->
+            </div>
+            <p id="orgs-empty" class="mt-3 hidden text-xs text-ink-500">
+              No customers yet. Create one in Super Admin (create customer and store, then get an activation code).
+            </p>
+          </section>
+
+          <!-- Org detail -->
+          <section class="w-full lg:w-2/3">
+            <div class="flex items-center justify-between gap-2">
+              <div>
+                <h2 id="org-name" class="font-display text-xl font-bold text-ink-900">Select an organization</h2>
+                <p id="org-subtitle" class="mt-1 text-xs text-ink-600">Entitlements, stores, and device activity.</p>
+              </div>
+            </div>
+
+            <div id="org-detail" class="mt-4 hidden space-y-6">
+              <!-- Entitlements -->
+              <div class="card" id="section-devices">
+                <div class="flex items-center justify-between gap-2">
+                  <h3 class="text-sm font-semibold text-ink-900">Entitlements</h3>
+                  <span id="org-cloud-status" class="inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium"></span>
+                </div>
+                <div class="mt-2 flex flex-wrap items-center justify-between gap-2">
+                  <p class="text-xs text-ink-600">
+                    Internal-only: grant or extend Cloud Sync for this organization.
+                  </p>
+                  <button id="grant-cloud-sync-btn" class="btn-secondary text-xs">Grant Cloud Sync</button>
+                </div>
+                <table class="mt-3 w-full text-left text-xs">
+                  <thead class="border-b border-ink-100 text-ink-500">
+                    <tr>
+                      <th class="py-1 pr-2">Plan</th>
+                      <th class="py-1 px-2">Valid from</th>
+                      <th class="py-1 px-2">Valid until</th>
+                      <th class="py-1 px-2 text-right">Cloud sync add-on</th>
+                    </tr>
+                  </thead>
+                  <tbody id="org-entitlements-body" class="align-top text-ink-800">
+                  </tbody>
+                </table>
+                <p id="org-entitlements-empty" class="mt-3 hidden text-xs text-ink-500">
+                  No entitlements yet. Use internal tools to grant a Cloud Sync subscription.
+                </p>
+              </div>
+
+              <!-- Stores -->
+              <div class="card" id="section-orders">
+                <div class="flex items-center justify-between gap-2">
+                  <h3 class="text-sm font-semibold text-ink-900">Stores</h3>
+                </div>
+                <div class="mt-3 overflow-hidden rounded-xl border border-ink-100">
+                  <table class="min-w-full divide-y divide-ink-100 text-xs">
+                    <thead class="bg-ink-50 text-ink-500">
+                      <tr>
+                        <th class="px-3 py-1 text-left font-medium">Store</th>
+                        <th class="px-3 py-1 text-left font-medium">Timezone</th>
+                        <th class="px-3 py-1 text-right font-medium">Devices</th>
+                        <th class="px-3 py-1 text-left font-medium">Last event</th>
+                        <th class="px-3 py-1 text-right font-medium"></th>
+                      </tr>
+                    </thead>
+                    <tbody id="org-stores-body" class="divide-y divide-ink-100 bg-white">
+                    </tbody>
+                  </table>
+                  <p id="org-stores-empty" class="px-3 py-4 text-center text-xs text-ink-500">
+                    No stores yet. They appear after you create a customer and store and someone enters the activation code on a till.
+                  </p>
+                </div>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function setUserName(name) {
+      document.getElementById('user-name').textContent = name;
+      document.getElementById('user-name-mobile').textContent = name;
+    }
+
+    function formatDateTime(value) {
+      if (!value) return '–';
+      return value.replace('T', ' ');
+    }
+    function formatFriendlyDateTime(value) {
+      if (!value) return '–';
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return value;
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+      if (day.getTime() === today.getTime()) return 'Today ' + time;
+      if (day.getTime() === yesterday.getTime()) return 'Yesterday ' + time;
+      return dateStr + ', ' + time;
+    }
+
+    function formatCloudStatus(active) {
+      const el = document.getElementById('org-cloud-status');
+      if (!el) return;
+      if (active) {
+        el.textContent = 'Cloud Sync: Active';
+        el.className = 'inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700';
+      } else {
+        el.textContent = 'Cloud Sync: Inactive';
+        el.className = 'inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[11px] font-medium text-amber-700';
+      }
+    }
+
+    async function loadOrgs() {
+      const res = await fetch('/api/portal/orgs');
+      if (!res.ok) throw new Error('Failed to load organizations');
+      const data = await res.json();
+      const orgs = data.organizations || [];
+      const list = document.getElementById('orgs-list');
+      const empty = document.getElementById('orgs-empty');
+      list.innerHTML = '';
+
+      // Update summary
+      const totalStores = orgs.reduce((acc, o) => acc + (o.store_count || 0), 0);
+      const withSync = orgs.filter(o => o.cloud_sync_active).length;
+      document.getElementById('summary-org-count').textContent = orgs.length;
+      document.getElementById('summary-store-count').textContent = totalStores;
+      document.getElementById('summary-sync-count').textContent = withSync;
+
+      if (orgs.length === 0) {
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      for (const org of orgs) {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-ink-800 hover:bg-ink-50';
+        btn.dataset.orgId = org.id;
+        btn.innerHTML = `
+          <div>
+            <div class="text-sm font-medium">${org.name}</div>
+            <div class="mt-0.5 text-[11px] text-ink-500">${org.slug || ''}</div>
+          </div>
+          <div class="text-right text-[11px] text-ink-500">
+            <div>${org.store_count} stores</div>
+            <div>${org.cloud_sync_active ? 'Cloud Sync active' : 'Cloud Sync inactive'}</div>
+          </div>
+        `;
+        btn.addEventListener('click', () => selectOrg(org.id));
+        list.appendChild(btn);
+      }
+      const urlOrg = new URLSearchParams(window.location.search).get('org_id');
+      if (urlOrg && orgs.some(o => o.id === urlOrg)) {
+        await selectOrg(urlOrg);
+      } else if (orgs.length > 0) {
+        await selectOrg(orgs[0].id);
+      }
+    }
+
+    async function selectOrg(orgId) {
+      const res = await fetch(`/api/portal/orgs/${encodeURIComponent(orgId)}`);
+      if (!res.ok) throw new Error('Failed to load organization');
+      const data = await res.json();
+      document.getElementById('org-detail').classList.remove('hidden');
+      document.getElementById('org-name').textContent = data.name;
+      document.getElementById('org-subtitle').textContent = `Created ${formatFriendlyDateTime(data.created_at)}`;
+
+      // Entitlements
+      const entBody = document.getElementById('org-entitlements-body');
+      const entEmpty = document.getElementById('org-entitlements-empty');
+      entBody.innerHTML = '';
+      const ents = data.entitlements || [];
+      if (ents.length === 0) {
+        entEmpty.classList.remove('hidden');
+      } else {
+        entEmpty.classList.add('hidden');
+        for (const e of ents) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="py-1 pr-2 align-top">${e.plan_name} <span class="text-[11px] text-ink-500">(${e.plan_code})</span></td>
+            <td class="py-1 px-2 align-top text-ink-700">${formatFriendlyDateTime(e.valid_from)}</td>
+            <td class="py-1 px-2 align-top text-ink-700">${e.valid_until ? formatFriendlyDateTime(e.valid_until) : 'Open-ended'}</td>
+            <td class="py-1 px-2 align-top text-right">
+              ${e.cloud_sync_add_on ? '<span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Yes</span>' : '<span class="inline-flex rounded-full bg-ink-50 px-2 py-0.5 text-[11px] font-medium text-ink-500">No</span>'}
+            </td>
+          `;
+          entBody.appendChild(tr);
+        }
+      }
+
+      // Remember currently selected org id for entitlement actions
+      window.currentOrgId = data.id;
+
+      // Cloud status badge (based on any active cloud_sync entitlement)
+      const hasCloudSync = ents.some(e => e.plan_code === 'cloud_sync' && (!e.valid_until || new Date(e.valid_until) > new Date()));
+      formatCloudStatus(hasCloudSync);
+
+      // Stores
+      const storesBody = document.getElementById('org-stores-body');
+      const storesEmpty = document.getElementById('org-stores-empty');
+      storesBody.innerHTML = '';
+      const stores = data.stores || [];
+      if (stores.length === 0) {
+        storesEmpty.classList.remove('hidden');
+      } else {
+        storesEmpty.classList.add('hidden');
+        for (const s of stores) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="px-3 py-2 align-top text-ink-800">${s.name}</td>
+            <td class="px-3 py-2 align-top text-ink-600 text-xs">${s.timezone || '—'}</td>
+            <td class="px-3 py-2 align-top text-right text-ink-800">${s.device_count}</td>
+            <td class="px-3 py-2 align-top text-xs text-ink-500">${formatFriendlyDateTime(s.last_event_at)}</td>
+            <td class="px-3 py-2 align-top text-right">
+              <a href="/store?store_id=${encodeURIComponent(s.id)}" class="text-xs font-medium text-traqr-600 hover:text-traqr-500">Open store →</a>
+            </td>
+          `;
+          storesBody.appendChild(tr);
+        }
+      }
+    }
+
+    async function init() {
+      try {
+        const storedName = window.localStorage.getItem('traqr_display_name');
+        if (storedName) setUserName(storedName);
+      } catch (_) {}
+      document.getElementById('refresh-orgs-btn').addEventListener('click', () => {
+        loadOrgs().catch(err => {
+          console.error(err);
+          alert('Failed to refresh organizations. Check API logs.');
+        });
+      });
+      document.getElementById('grant-cloud-sync-btn').addEventListener('click', async () => {
+        if (!window.currentOrgId) {
+          alert('Select an organization first.');
+          return;
+        }
+        if (!confirm('Grant or extend Cloud Sync entitlement for this organization?')) {
+          return;
+        }
+        try {
+          const res = await fetch(`/api/portal/orgs/${encodeURIComponent(window.currentOrgId)}/entitlements/cloud_sync`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ valid_until: null })
+          });
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to grant Cloud Sync');
+          }
+          await selectOrg(window.currentOrgId);
+        } catch (err) {
+          console.error(err);
+          alert('Failed to grant Cloud Sync. Check API logs.');
+        }
+      });
+
+      // Adjust helper copy based on hash
+      const hash = window.location.hash;
+      const helper = document.getElementById('orgs-helper');
+      if (hash === '#devices') {
+        helper.textContent = 'Click a customer to see their stores. Open a store to manage tills and create activation codes.';
+      } else if (hash === '#menus') {
+        helper.textContent = 'Select an organization and open a store to view the menu (categories, items, prices, availability) as synced from the POS.';
+      } else if (hash === '#orders') {
+        helper.textContent = 'Select an organization and open a store to see orders and receipts. Open an order to view details and issue void/refund commands.';
+      } else if (hash === '#commands') {
+        helper.textContent = 'Select an organization and open a store to see the Command Center tab, or go to the Command Center page and choose a store.';
+      }
+
+      await loadOrgs();
+    }
+
+    init().catch(err => console.error(err));
+  </script>
+</body>
+</html>
+

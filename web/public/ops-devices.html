@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Devices &amp; Activation — Traqr Cloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="/css/output.css" rel="stylesheet" />
+</head>
+<body class="min-h-screen bg-ink-100">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="hidden w-64 flex-col border-r border-ink-200 bg-white/90 px-4 py-6 sm:flex">
+      <a href="/" class="mb-8 inline-flex items-center gap-2 text-ink-900">
+        <img src="/traqr.png" alt="Traqr" class="h-8 w-auto" />
+        <span class="text-sm font-medium text-ink-600">Cloud</span>
+      </a>
+      <nav class="space-y-1 text-sm">
+        <div class="text-xs font-semibold uppercase tracking-wide text-ink-500">Main</div>
+        <a href="/dashboard" class="mt-1 block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Overview</a>
+        <div class="mt-4 text-xs font-semibold uppercase tracking-wide text-ink-500">Operations</div>
+        <a href="/organizations" class="block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Organizations &amp; Stores</a>
+        <a href="/ops-devices" class="mt-1 flex items-center justify-between rounded-lg bg-ink-900 px-3 py-2 font-medium text-white">
+          <span>Devices &amp; Activation</span>
+        </a>
+        <a href="/ops-menus" class="block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Menus &amp; Availability</a>
+        <a href="/ops-orders" class="block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Orders &amp; Receipts</a>
+        <a href="/ops-commands" class="block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Command Center</a>
+      </nav>
+      <div class="mt-auto pt-6 text-xs text-ink-500">
+        Logged in as <span id="user-name">Demo Admin</span>
+      </div>
+    </aside>
+
+    <main class="flex-1">
+      <header class="flex items-center justify-between border-b border-ink-200 bg-white px-4 py-3 sm:hidden">
+        <div class="inline-flex items-center gap-2 text-ink-900">
+          <img src="/traqr.png" alt="Traqr" class="h-7 w-auto" />
+          <span class="text-sm font-medium text-ink-600">Cloud</span>
+        </div>
+        <span id="user-name-mobile" class="text-xs text-ink-500">Demo Admin</span>
+      </header>
+
+      <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <header>
+          <h1 class="font-display text-2xl font-bold text-ink-900">Devices &amp; Activation</h1>
+          <p class="mt-2 text-sm text-ink-600">
+            See which tills are connected and when they last synced. Create activation codes so new tills can connect. Pick an organization on the left to see its stores.
+          </p>
+        </header>
+
+        <div class="mt-6 flex flex-col gap-6 lg:flex-row">
+          <!-- Org list -->
+          <section class="w-full lg:w-1/3">
+            <div class="flex items-center justify-between gap-2">
+              <h2 class="text-sm font-semibold text-ink-900">Organizations</h2>
+              <button id="refresh-orgs-btn" class="btn-secondary text-xs">Refresh</button>
+            </div>
+            <div id="orgs-list" class="mt-3 space-y-1 overflow-hidden rounded-xl border border-ink-200 bg-white p-2 text-sm"></div>
+            <p id="orgs-empty" class="mt-3 hidden text-xs text-ink-500">No organizations yet. Create one from Super Admin or via activation key.</p>
+          </section>
+
+          <!-- Store list (devices per store) -->
+          <section class="w-full lg:w-2/3">
+            <h2 id="stores-heading" class="text-sm font-semibold text-ink-900">Stores &amp; devices</h2>
+            <p id="stores-subtitle" class="mt-0.5 text-xs text-ink-600">Select an organization to see stores and device counts.</p>
+            <div id="stores-panel" class="mt-4 hidden">
+              <div class="overflow-hidden rounded-xl border border-ink-200 bg-white">
+                <table class="min-w-full divide-y divide-ink-100 text-xs">
+                  <thead class="bg-ink-50 text-ink-500">
+                    <tr>
+                      <th class="px-3 py-2 text-left font-medium">Store</th>
+                      <th class="px-3 py-2 text-right font-medium">Devices</th>
+                      <th class="px-3 py-2 text-left font-medium">Last activity</th>
+                      <th class="px-3 py-2 text-right font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="stores-body" class="divide-y divide-ink-100 bg-white"></tbody>
+                </table>
+                <p id="stores-empty" class="px-3 py-4 text-center text-xs text-ink-500 hidden">No stores in this organization.</p>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function setUserName(name) {
+      document.getElementById('user-name').textContent = name;
+      document.getElementById('user-name-mobile').textContent = name;
+    }
+    function formatFriendlyDateTime(v) {
+      if (!v) return '–';
+      const d = new Date(v);
+      if (isNaN(d.getTime())) return v;
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+      if (day.getTime() === today.getTime()) return 'Today ' + time;
+      if (day.getTime() === yesterday.getTime()) return 'Yesterday ' + time;
+      return dateStr + ', ' + time;
+    }
+
+    async function loadOrgs() {
+      const res = await fetch('/api/portal/orgs');
+      if (!res.ok) throw new Error('Failed to load organizations');
+      const data = await res.json();
+      const orgs = data.organizations || [];
+      const list = document.getElementById('orgs-list');
+      const empty = document.getElementById('orgs-empty');
+      list.innerHTML = '';
+      if (orgs.length === 0) {
+        empty.classList.remove('hidden');
+        return;
+      }
+      empty.classList.add('hidden');
+      orgs.forEach(org => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'flex w-full items-center justify-between rounded-lg px-3 py-2 text-left text-ink-800 hover:bg-ink-50';
+        btn.dataset.orgId = org.id;
+        btn.innerHTML = `
+          <span class="font-medium">${org.name}</span>
+          <span class="text-[11px] text-ink-500">${org.store_count} stores</span>
+        `;
+        btn.addEventListener('click', () => selectOrg(org.id));
+        list.appendChild(btn);
+      });
+      if (orgs.length > 0 && !window.location.hash) await selectOrg(orgs[0].id);
+    }
+
+    async function selectOrg(orgId) {
+      document.querySelectorAll('#orgs-list button').forEach(b => {
+        b.classList.toggle('bg-ink-100', b.dataset.orgId === orgId);
+      });
+      const res = await fetch('/api/portal/orgs/' + encodeURIComponent(orgId));
+      if (!res.ok) throw new Error('Failed to load organization');
+      const data = await res.json();
+      document.getElementById('stores-heading').textContent = data.name + ' — Stores & devices';
+      document.getElementById('stores-subtitle').textContent = 'Open a store to see its tills and create activation codes.';
+      document.getElementById('stores-panel').classList.remove('hidden');
+      const body = document.getElementById('stores-body');
+      const empty = document.getElementById('stores-empty');
+      body.innerHTML = '';
+      const stores = data.stores || [];
+      if (stores.length === 0) {
+        empty.classList.remove('hidden');
+      } else {
+        empty.classList.add('hidden');
+        stores.forEach(s => {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="px-3 py-2 font-medium text-ink-800">${s.name}</td>
+            <td class="px-3 py-2 text-right text-ink-700">${s.device_count}</td>
+            <td class="px-3 py-2 text-ink-500">${formatFriendlyDateTime(s.last_event_at)}</td>
+            <td class="px-3 py-2 text-right">
+              <a href="/store?store_id=${encodeURIComponent(s.id)}" class="font-medium text-traqr-600 hover:text-traqr-500">View devices →</a>
+            </td>
+          `;
+          body.appendChild(tr);
+        });
+      }
+    }
+
+    (function init() {
+      try { const n = window.localStorage.getItem('traqr_display_name'); if (n) setUserName(n); } catch (_) {}
+      document.getElementById('refresh-orgs-btn').addEventListener('click', () => loadOrgs().catch(e => { console.error(e); alert('Failed to refresh.'); }));
+      loadOrgs().catch(e => console.error(e));
+    })();
+  </script>
+</body>
+</html>

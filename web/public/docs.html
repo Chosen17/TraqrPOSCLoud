@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Docs — Traqr Cloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="/css/output.css" rel="stylesheet" />
+  <style>
+    .docs-sidebar { max-height: calc(100vh - 6rem); overflow-y: auto; }
+    .docs-sidebar a.active { background: #e2e8f0; color: #0f172a; font-weight: 500; }
+    .docs-content pre { background: #1e293b; color: #e2e8f0; padding: 1rem; border-radius: 0.5rem; overflow-x: auto; font-size: 0.875rem; }
+    .docs-content pre code { background: none; padding: 0; }
+    .docs-content code { background: #f1f5f9; padding: 0.125rem 0.375rem; border-radius: 0.25rem; font-size: 0.875em; }
+    .docs-content h2 { font-size: 1.25rem; font-weight: 600; margin-top: 1.5rem; margin-bottom: 0.5rem; padding-bottom: 0.25rem; border-bottom: 1px solid #e2e8f0; }
+    .docs-content h3 { font-size: 1.1rem; font-weight: 600; margin-top: 1rem; margin-bottom: 0.25rem; }
+    .docs-content p { margin-bottom: 0.75rem; }
+    .docs-content ul { margin-bottom: 0.75rem; padding-left: 1.5rem; list-style: disc; }
+    .docs-content ol { margin-bottom: 0.75rem; padding-left: 1.5rem; list-style: decimal; }
+  </style>
+</head>
+<body class="min-h-screen bg-ink-100">
+  <header class="border-b border-ink-200 bg-white">
+    <nav class="mx-auto flex max-w-6xl items-center justify-between gap-4 px-4 py-4">
+      <a href="/" class="inline-flex items-center gap-2 text-ink-900">
+        <img src="/traqr.png" alt="Traqr" class="h-7 w-auto" />
+        <span class="text-sm font-medium text-ink-600">Cloud</span>
+      </a>
+      <div class="flex items-center gap-6">
+        <a href="/blog" class="text-sm text-ink-600 hover:text-ink-900">Blog</a>
+        <a href="/docs" class="text-sm font-medium text-traqr-600">Docs</a>
+        <a href="/dashboard" class="text-sm text-ink-600 hover:text-ink-900">Dashboard</a>
+      </div>
+    </nav>
+  </header>
+
+  <div class="mx-auto flex max-w-6xl gap-8 px-4 py-6">
+    <!-- Side panel (Stripe-style) -->
+    <aside class="w-56 shrink-0">
+      <nav class="docs-sidebar sticky top-6 space-y-4 text-sm" id="docs-sidebar" aria-label="Docs navigation">
+        <p class="text-ink-500">Loading…</p>
+      </nav>
+    </aside>
+
+    <!-- Main content + breadcrumbs -->
+    <main class="min-w-0 flex-1">
+      <nav class="mb-4 flex items-center gap-2 text-sm text-ink-500" id="docs-breadcrumbs" aria-label="Breadcrumb">
+        <a href="/docs" class="hover:text-ink-700">Docs</a>
+      </nav>
+      <article id="docs-content" class="card docs-content">
+        <p class="text-ink-500">Loading…</p>
+      </article>
+    </main>
+  </div>
+
+  <script>
+    function escapeHtml(s) {
+      if (!s) return '';
+      var d = document.createElement('div');
+      d.textContent = s;
+      return d.innerHTML;
+    }
+    function renderBody(body) {
+      if (!body) return '';
+      var html = escapeHtml(body).replace(/\n/g, '<br>');
+      html = html.replace(/!\[([^\]]*)\]\(([^)]+)\)/g, function (_, alt, url) { return '<img src="' + (url.indexOf('/') === 0 ? (window.location.origin || '') + url : url) + '" alt="' + escapeHtml(alt) + '" class="rounded-lg max-w-full my-2" />'; });
+      html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+      html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+      html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+      html = html.replace(/^# (.+)$/gm, '<h2>$1</h2>');
+      html = html.replace(/~~([\s\S]*?)~~/g, '<s>$1</s>');
+      return html;
+    }
+    function buildSidebar(docs) {
+      var bySection = {};
+      docs.forEach(function (d) {
+        var s = d.section || 'General';
+        if (!bySection[s]) bySection[s] = [];
+        bySection[s].push(d);
+      });
+      var sections = Object.keys(bySection).sort();
+      var path = window.location.pathname.replace(/^\/docs\/?/, '') || '';
+      var currentSlug = path && path !== 'new' ? path : null;
+      var html = '';
+      sections.forEach(function (section) {
+        html += '<div class="mb-4"><div class="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">' + escapeHtml(section) + '</div><ul class="space-y-0.5">';
+        bySection[section].forEach(function (d) {
+          var active = currentSlug === d.slug ? ' active' : '';
+          html += '<li><a href="/docs/' + escapeHtml(d.slug) + '" class="block rounded-lg px-2 py-1.5 text-ink-700 hover:bg-ink-100' + active + '">' + escapeHtml(d.title) + '</a></li>';
+        });
+        html += '</ul></div>';
+      });
+      if (sections.length === 0) html = '<p class="text-ink-500">No docs yet.</p>';
+      return html;
+    }
+    async function load() {
+      var sidebar = document.getElementById('docs-sidebar');
+      var breadcrumbs = document.getElementById('docs-breadcrumbs');
+      var content = document.getElementById('docs-content');
+      var path = window.location.pathname.replace(/^\/docs\/?/, '') || '';
+      var slug = path && path !== 'new' ? path : null;
+      var isNew = path === 'new';
+
+      try {
+        var listRes = await fetch('/api/portal/docs/public');
+        var docs = listRes.ok ? await listRes.json() : [];
+        sidebar.innerHTML = buildSidebar(docs);
+        var meRes = await fetch('/api/auth/me', { credentials: 'include' });
+        var me = meRes.ok ? await meRes.json() : {};
+        var role = me && me.role;
+        if (role === 'sa_owner' || role === 'sa_manager') {
+          sidebar.innerHTML = '<div class="mb-4"><div class="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-500">Create</div><ul class="space-y-0.5"><li><a href="/docs/new" class="block rounded-lg px-2 py-1.5 font-medium text-traqr-600 hover:bg-traqr-50">+ New doc</a></li></ul></div>' + sidebar.innerHTML;
+        }
+
+        if (isNew) {
+          document.title = 'New doc — Docs — Traqr Cloud';
+          breadcrumbs.innerHTML = '<a href="/docs" class="hover:text-ink-700">Docs</a><span class="text-ink-400">/</span><span>New doc</span>';
+          var formHtml = '<div class="card"><h1 class="font-display text-xl font-bold text-ink-900">New doc</h1><p class="mt-1 text-sm text-ink-500">Add a guide or setup page. Owner and manager can create docs.</p><form id="new-doc-form" class="mt-4 space-y-4">' +
+            '<div><label class="block text-xs font-medium text-ink-700">Title</label><input type="text" id="dtitle" required class="mt-0.5 block w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm" placeholder="e.g. Getting started" /></div>' +
+            '<div><label class="block text-xs font-medium text-ink-700">Section</label><input type="text" id="dsection" class="mt-0.5 block w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm" placeholder="e.g. Getting started" value="General" /></div>' +
+            '<div><label class="block text-xs font-medium text-ink-700">Order (number)</label><input type="number" id="dorder" class="mt-0.5 block w-full rounded-lg border border-ink-200 px-2 py-1.5 text-sm" value="0" /></div>' +
+            '<div><label class="block text-xs font-medium text-ink-700">Content</label><div class="format-toolbar mt-0.5 flex flex-wrap items-center gap-1 rounded-t-lg border border-ink-200 border-b-0 bg-ink-50 px-2 py-1" data-target="dbody"><button type="button" class="format-btn rounded px-2 py-1 text-sm font-bold hover:bg-ink-200" data-wrap-before="**" data-wrap-after="**" title="Bold">B</button><button type="button" class="format-btn rounded px-2 py-1 text-sm italic hover:bg-ink-200" data-wrap-before="*" data-wrap-after="*" title="Italic">I</button><button type="button" class="format-btn rounded px-2 py-1 text-sm hover:bg-ink-200" data-wrap-before="[" data-wrap-after="](url)" title="Link">Link</button><button type="button" class="format-btn rounded px-2 py-1 text-sm hover:bg-ink-200" data-line-prefix="## " title="Heading">H</button><button type="button" class="format-btn rounded px-2 py-1 text-sm font-mono hover:bg-ink-200" data-wrap-before="`" data-wrap-after="`" title="Code">Code</button><button type="button" class="format-btn rounded px-2 py-1 text-sm hover:bg-ink-200" data-line-prefix="- " title="Bullet list">•</button><button type="button" class="format-btn rounded px-2 py-1 text-sm hover:bg-ink-200" data-line-prefix="1. " title="Numbered list">1.</button><button type="button" class="format-btn rounded px-2 py-1 text-sm hover:bg-ink-200" data-line-prefix="> " title="Block quote">"</button><button type="button" class="format-btn rounded px-2 py-1 text-sm hover:bg-ink-200" data-wrap-before="~~" data-wrap-after="~~" title="Strikethrough">S</button></div><textarea id="dbody" rows="12" required class="mt-0 block w-full rounded-b-lg rounded-t-none border border-ink-200 border-t-0 px-2 py-1.5 text-sm font-mono" placeholder="Use # for headings, **bold**, and [link](url)."></textarea></div>' +
+            '<button type="submit" class="btn-primary text-sm">Create doc</button></form></div>';
+          content.innerHTML = formHtml;
+          (function initFormatToolbar() {
+            var toolbar = document.querySelector('.format-toolbar[data-target="dbody"]');
+            var ta = document.getElementById('dbody');
+            if (!toolbar || !ta) return;
+            function applyWrap(before, after) {
+              var start = ta.selectionStart, end = ta.selectionEnd, val = ta.value, sel = val.slice(start, end);
+              var newText = before + sel + after;
+              ta.value = val.slice(0, start) + newText + val.slice(end);
+              ta.setSelectionRange(start + before.length, start + before.length + sel.length);
+              ta.focus();
+            }
+            function applyLinePrefix(prefix) {
+              var start = ta.selectionStart, val = ta.value;
+              var lineStart = val.lastIndexOf('\n', start - 1) + 1;
+              ta.value = val.slice(0, lineStart) + prefix + val.slice(lineStart);
+              ta.setSelectionRange(lineStart + prefix.length, lineStart + prefix.length);
+              ta.focus();
+            }
+            toolbar.querySelectorAll('.format-btn').forEach(function (btn) {
+              btn.addEventListener('click', function () {
+                var before = btn.getAttribute('data-wrap-before'), after = btn.getAttribute('data-wrap-after');
+                var linePrefix = btn.getAttribute('data-line-prefix');
+                if (before !== null && after !== null) {
+                  if (before === '[' && after === '](url)') {
+                    var s = ta.selectionStart, e = ta.selectionEnd, sel = ta.value.slice(s, e);
+                    var url = prompt('Link URL:', 'https://');
+                    if (url != null) { before = '['; after = '](' + url + ')'; applyWrap(before, after); }
+                  } else applyWrap(before, after);
+                } else if (linePrefix) applyLinePrefix(linePrefix);
+              });
+            });
+          })();
+          document.getElementById('new-doc-form').addEventListener('submit', async function (e) {
+            e.preventDefault();
+            var title = document.getElementById('dtitle').value.trim();
+            var section = document.getElementById('dsection').value.trim() || 'General';
+            var order = parseInt(document.getElementById('dorder').value, 10) || 0;
+            var body = document.getElementById('dbody').value;
+            var r = await fetch('/api/portal/docs', {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ title: title, body: body, section: section, sort_order: order })
+            });
+            if (r.ok) {
+              var d = await r.json();
+              window.location.href = '/docs/' + d.slug;
+            } else {
+              var err = await r.json().catch(function() { return {}; });
+              alert(err.message || err.detail || 'You need to be logged in as owner or manager to create docs.');
+            }
+          });
+          if (role !== 'sa_owner' && role !== 'sa_manager') {
+            content.innerHTML = '<div class="card"><h1 class="font-display text-xl font-bold text-ink-900">New doc</h1><p class="mt-2 text-sm text-ink-500">Only owner and manager can create docs. <a href="/docs" class="text-traqr-600">Back to docs</a></p></div>';
+          }
+          return;
+        }
+        if (!slug) {
+          document.title = 'Docs — Traqr Cloud';
+          breadcrumbs.innerHTML = '<span>Docs</span>';
+          var intro = '<h1 class="font-display text-2xl font-bold text-ink-900">Documentation</h1><p class="mt-2 text-ink-600">Guides and setup for Traqr Cloud. Choose a topic from the sidebar.</p>';
+          content.innerHTML = intro;
+          fetch('/api/auth/me', { credentials: 'include' }).then(function(r) { return r.ok ? r.json() : {}; }).then(function(me) {
+            var role = me && me.role;
+            if (role === 'sa_owner' || role === 'sa_manager')
+              content.innerHTML = intro + '<p class="mt-4"><a href="/docs/new" class="text-traqr-600 font-medium">' + (docs.length === 0 ? 'Create the first doc' : 'New doc') + '</a></p>';
+          }).catch(function() {});
+          return;
+        }
+
+        var res = await fetch('/api/portal/docs/by-slug/' + encodeURIComponent(slug));
+        if (!res.ok) {
+          content.innerHTML = '<p class="text-ink-500">Page not found.</p>';
+          return;
+        }
+        var doc = await res.json();
+        document.title = doc.title + ' — Docs — Traqr Cloud';
+        breadcrumbs.innerHTML = '<a href="/docs" class="hover:text-ink-700">Docs</a><span class="text-ink-400">/</span><span class="text-ink-600">' + escapeHtml(doc.section) + '</span><span class="text-ink-400">/</span><span>' + escapeHtml(doc.title) + '</span>';
+        content.innerHTML = '<h1 class="font-display text-2xl font-bold text-ink-900">' + escapeHtml(doc.title) + '</h1><div class="mt-6 text-ink-700">' + renderBody(doc.body) + '</div>';
+      } catch (err) {
+        console.error(err);
+        content.innerHTML = '<p class="text-ink-500">Failed to load docs.</p>';
+      }
+    }
+    load();
+  </script>
+</body>
+</html>

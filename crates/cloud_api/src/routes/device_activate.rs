@@ -10,7 +10,7 @@ use uuid::Uuid;
 use crate::state::AppState;
 use db::{
     create_device, create_device_sync_state, create_device_token, find_activation_key_by_hash,
-    increment_activation_key_uses, resolve_store_for_activation,
+    has_active_entitlement, increment_activation_key_uses, resolve_store_for_activation,
 };
 use domain::{ActivateDeviceRequest, ActivateDeviceResponse};
 
@@ -38,6 +38,24 @@ async fn activate_device(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or_else(|| (StatusCode::UNAUTHORIZED, "invalid or revoked activation key".to_string()))?;
 
+    let org_id = Uuid::parse_str(&key_row.org_id)
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "invalid org_id in activation key".to_string()))?;
+    let scope_id = key_row
+        .scope_id
+        .as_ref()
+        .and_then(|s| Uuid::parse_str(s).ok());
+
+    // Enforce Cloud Sync entitlement at org level before allowing activation.
+    let cloud_sync_ok = has_active_entitlement(db, org_id, "cloud_sync")
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !cloud_sync_ok {
+        return Err((
+            StatusCode::FORBIDDEN,
+            serde_json::json!({ "error": "Cloud sync not enabled for this organization" }).to_string(),
+        ));
+    }
+
     if let Some(exp) = key_row.expires_at {
         if exp < chrono::Utc::now() {
             return Err((
@@ -57,9 +75,9 @@ async fn activate_device(
 
     let store_id = resolve_store_for_activation(
         db,
-        key_row.org_id,
+        org_id,
         &key_row.scope_type,
-        key_row.scope_id,
+        scope_id,
         req.store_hint,
     )
     .await
@@ -72,12 +90,17 @@ async fn activate_device(
         )
     })?;
 
+    let device_name = req.device_name.as_deref().filter(|s| !s.is_empty());
+    let is_primary = req.is_primary.unwrap_or(false);
+
     let device_id = create_device(
         db,
-        key_row.org_id,
+        org_id,
         store_id,
         None,
         None,
+        device_name,
+        is_primary,
     )
     .await
     .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
@@ -88,17 +111,19 @@ async fn activate_device(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    create_device_sync_state(db, device_id, key_row.org_id, store_id)
+    create_device_sync_state(db, device_id, org_id, store_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
-    increment_activation_key_uses(db, key_row.id)
+    let key_id = Uuid::parse_str(&key_row.id)
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "invalid key id".to_string()))?;
+    increment_activation_key_uses(db, key_id)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
 
     Ok(Json(ActivateDeviceResponse {
         device_id,
-        org_id: key_row.org_id,
+        org_id,
         store_id,
         device_token: raw_token,
         polling_interval_seconds: 10,

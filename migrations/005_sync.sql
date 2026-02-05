@@ -1,43 +1,56 @@
 CREATE TABLE device_event_log (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  store_id uuid NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  device_id uuid NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-  event_id uuid NOT NULL,
-  seq bigint NULL,
-  event_type text NOT NULL,
-  event_body jsonb NOT NULL,
-  occurred_at timestamptz NOT NULL,
-  received_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(device_id, event_id)
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  org_id CHAR(36) NOT NULL,
+  store_id CHAR(36) NOT NULL,
+  device_id CHAR(36) NOT NULL,
+  event_id CHAR(36) NOT NULL,
+  seq BIGINT NULL,
+  event_type VARCHAR(100) NOT NULL,
+  event_body JSON NOT NULL,
+  occurred_at DATETIME(3) NOT NULL,
+  received_at DATETIME(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3)),
+  UNIQUE KEY uq_device_event_log_device_event (device_id, event_id),
+  FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
+  FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
 CREATE TABLE device_sync_state (
-  device_id uuid PRIMARY KEY REFERENCES devices(id) ON DELETE CASCADE,
-  org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  store_id uuid NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  last_ack_seq bigint NULL,
-  updated_at timestamptz NOT NULL DEFAULT now()
+  device_id CHAR(36) PRIMARY KEY,
+  org_id CHAR(36) NOT NULL,
+  store_id CHAR(36) NOT NULL,
+  last_ack_seq BIGINT NULL,
+  updated_at DATETIME(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3)) ON UPDATE CURRENT_TIMESTAMP(3),
+  FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE,
+  FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE
 );
 
 CREATE TABLE device_command_queue (
-  command_id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  store_id uuid NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
-  device_id uuid NOT NULL REFERENCES devices(id) ON DELETE CASCADE,
-  command_type text NOT NULL,
-  command_body jsonb NOT NULL,
-  status text NOT NULL DEFAULT 'queued',
-  sensitive boolean NOT NULL DEFAULT false,
-  created_at timestamptz NOT NULL DEFAULT now()
+  command_id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  org_id CHAR(36) NOT NULL,
+  store_id CHAR(36) NOT NULL,
+  device_id CHAR(36) NOT NULL,
+  command_type VARCHAR(100) NOT NULL,
+  command_body JSON NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'queued',
+  `sensitive` TINYINT(1) NOT NULL DEFAULT 0,
+  created_at DATETIME(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3)),
+  FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (store_id) REFERENCES stores(id) ON DELETE CASCADE,
+  FOREIGN KEY (device_id) REFERENCES devices(id) ON DELETE CASCADE
 );
 
 CREATE TABLE approvals (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  command_id uuid NOT NULL REFERENCES device_command_queue(command_id) ON DELETE CASCADE,
-  approver_user_id uuid NOT NULL REFERENCES cloud_users(id) ON DELETE CASCADE,
-  decision text NOT NULL CHECK (decision IN ('approve','reject')),
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(command_id, approver_user_id)
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  org_id CHAR(36) NOT NULL,
+  command_id CHAR(36) NOT NULL,
+  approver_user_id CHAR(36) NOT NULL,
+  decision VARCHAR(50) NOT NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3)),
+  UNIQUE KEY uq_approvals_command_approver (command_id, approver_user_id),
+  FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (command_id) REFERENCES device_command_queue(command_id) ON DELETE CASCADE,
+  FOREIGN KEY (approver_user_id) REFERENCES cloud_users(id) ON DELETE CASCADE,
+  CHECK (decision IN ('approve','reject'))
 );

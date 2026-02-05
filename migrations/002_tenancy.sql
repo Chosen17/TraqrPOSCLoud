@@ -1,30 +1,34 @@
 CREATE TABLE organizations (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  name text NOT NULL,
-  slug text NOT NULL UNIQUE,
-  status text NOT NULL DEFAULT 'active',
-  created_at timestamptz NOT NULL DEFAULT now()
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  name VARCHAR(255) NOT NULL,
+  slug VARCHAR(255) NOT NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'active',
+  created_at DATETIME(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3)),
+  UNIQUE KEY uq_organizations_slug (slug)
 );
 
 CREATE TABLE franchises (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  code text NULL,
-  created_at timestamptz NOT NULL DEFAULT now(),
-  UNIQUE(org_id, name)
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  org_id CHAR(36) NOT NULL,
+  name VARCHAR(255) NOT NULL,
+  code VARCHAR(100) NULL,
+  created_at DATETIME(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3)),
+  UNIQUE KEY uq_franchises_org_name (org_id, name),
+  FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE
 );
 
 CREATE TABLE stores (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  org_id uuid NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
-  franchise_id uuid NULL REFERENCES franchises(id) ON DELETE SET NULL,
-  name text NOT NULL,
-  code text NULL,
-  timezone text NOT NULL DEFAULT 'Europe/London',
-  address_json jsonb NULL,
-  status text NOT NULL DEFAULT 'active',
-  created_at timestamptz NOT NULL DEFAULT now()
+  id CHAR(36) PRIMARY KEY DEFAULT (UUID()),
+  org_id CHAR(36) NOT NULL,
+  franchise_id CHAR(36) NULL,
+  name VARCHAR(255) NOT NULL,
+  code VARCHAR(100) NULL,
+  timezone VARCHAR(100) NOT NULL DEFAULT 'Europe/London',
+  address_json JSON NULL,
+  status VARCHAR(50) NOT NULL DEFAULT 'active',
+  created_at DATETIME(3) NOT NULL DEFAULT (CURRENT_TIMESTAMP(3)),
+  FOREIGN KEY (org_id) REFERENCES organizations(id) ON DELETE CASCADE,
+  FOREIGN KEY (franchise_id) REFERENCES franchises(id) ON DELETE SET NULL
 );
 
 CREATE INDEX idx_franchises_org_id ON franchises(org_id);

@@ -7,7 +7,10 @@ use axum::{
 use serde::Deserialize;
 
 use crate::state::AppState;
-use db::{ack_command, fetch_deliverable_commands, mark_command_delivered, validate_device_token};
+use db::{
+    ack_command, fetch_deliverable_commands, has_active_entitlement, mark_command_delivered,
+    validate_device_token,
+};
 use domain::{CommandAckRequest, DeviceCommandOut, SyncCommandsResponse};
 
 pub fn router(_state: AppState) -> axum::Router<AppState> {
@@ -48,6 +51,17 @@ async fn get_commands(
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or_else(|| (StatusCode::UNAUTHORIZED, "invalid or revoked device token".to_string()))?;
 
+    // Enforce Cloud Sync entitlement at org level before delivering commands.
+    let cloud_sync_ok = has_active_entitlement(db, identity.org_id, "cloud_sync")
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !cloud_sync_ok {
+        return Err((
+            StatusCode::FORBIDDEN,
+            serde_json::json!({ "error": "Cloud sync not enabled for this organization" }).to_string(),
+        ));
+    }
+
     let limit = q.limit.unwrap_or(50).min(200) as i64;
     let rows = fetch_deliverable_commands(db, identity.device_id, limit)
         .await
@@ -55,13 +69,17 @@ async fn get_commands(
 
     let commands: Vec<DeviceCommandOut> = rows
         .into_iter()
-        .map(|r| DeviceCommandOut {
-            command_id: r.command_id,
-            command_type: r.command_type,
-            sensitive: r.sensitive,
-            command_body: r.command_body,
+        .map(|r| {
+            let command_id = uuid::Uuid::parse_str(&r.command_id)
+                .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "invalid command_id from db".to_string()))?;
+            Ok(DeviceCommandOut {
+                command_id,
+                command_type: r.command_type,
+                sensitive: r.sensitive,
+                command_body: r.command_body,
+            })
         })
-        .collect();
+        .collect::<Result<Vec<_>, _>>()?;
 
     for cmd in &commands {
         let _ = mark_command_delivered(db, cmd.command_id).await;
@@ -89,6 +107,18 @@ async fn ack_command_handler(
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?
         .ok_or_else(|| (StatusCode::UNAUTHORIZED, "invalid or revoked device token".to_string()))?;
+
+    // Enforce Cloud Sync entitlement for acknowledgements as well; if Cloud Sync
+    // has been removed, we no longer accept command traffic from this device.
+    let cloud_sync_ok = has_active_entitlement(db, identity.org_id, "cloud_sync")
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !cloud_sync_ok {
+        return Err((
+            StatusCode::FORBIDDEN,
+            serde_json::json!({ "error": "Cloud sync not enabled for this organization" }).to_string(),
+        ));
+    }
 
     let status = match req.status.as_str() {
         "acked" | "failed" => req.status.as_str(),

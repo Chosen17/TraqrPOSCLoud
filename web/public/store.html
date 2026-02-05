@@ -1,0 +1,640 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Store — Traqr Cloud</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap" rel="stylesheet" />
+  <link href="/css/output.css" rel="stylesheet" />
+</head>
+<body class="min-h-screen bg-ink-100">
+  <div class="flex min-h-screen">
+    <!-- Sidebar -->
+    <aside class="hidden w-64 flex-col border-r border-ink-200 bg-white/90 px-4 py-6 sm:flex">
+      <a href="/" class="mb-8 inline-flex items-center gap-2 text-ink-900">
+        <img src="/traqr.png" alt="Traqr" class="h-8 w-auto" />
+        <span class="text-sm font-medium text-ink-600">Cloud</span>
+      </a>
+      <nav class="space-y-1 text-sm">
+        <div class="text-xs font-semibold uppercase tracking-wide text-ink-500">Main</div>
+        <a href="/dashboard" class="mt-1 block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Overview</a>
+        <div class="mt-4 text-xs font-semibold uppercase tracking-wide text-ink-500">Operations</div>
+        <a href="/organizations" class="mt-1 block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Organizations &amp; Stores</a>
+        <a href="/ops-devices" class="block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Devices &amp; Activation</a>
+        <a href="/ops-menus" class="block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Menus &amp; Availability</a>
+        <a href="/ops-orders" class="block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Orders &amp; Receipts</a>
+        <a href="/ops-commands" class="block rounded-lg px-3 py-2 text-ink-700 hover:bg-ink-100">Command Center</a>
+      </nav>
+      <div class="mt-auto pt-6 text-xs text-ink-500">
+        Logged in as <span id="user-name">Demo Admin</span>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="flex-1">
+      <!-- Top bar (mobile) -->
+      <header class="flex items-center justify-between border-b border-ink-200 bg-white px-4 py-3 sm:hidden">
+        <div class="inline-flex items-center gap-2 text-ink-900">
+          <img src="/traqr.png" alt="Traqr" class="h-7 w-auto" />
+          <span class="text-sm font-medium text-ink-600">Cloud</span>
+        </div>
+        <div class="text-xs text-ink-500">
+          <span id="user-name-mobile">Demo Admin</span>
+        </div>
+      </header>
+
+      <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
+        <!-- Store header -->
+        <header>
+          <p id="store-breadcrumb" class="text-xs text-ink-500">
+            <a href="/organizations" class="hover:text-ink-800">Organizations</a>
+            <span>/</span>
+            <span id="store-org-name">Org</span>
+          </p>
+          <div class="mt-1 flex items-center justify-between gap-4">
+            <div>
+              <h1 id="store-name" class="font-display text-2xl font-bold text-ink-900">Store</h1>
+              <p id="store-subtitle" class="mt-1 text-xs text-ink-600">Cloud status and last POS activity.</p>
+            </div>
+            <div class="flex flex-col items-end gap-1 text-right text-xs">
+              <span id="store-cloud-status" class="inline-flex items-center rounded-full bg-ink-50 px-2 py-0.5 font-medium text-ink-600">Cloud Sync: Unknown</span>
+              <span id="store-last-event" class="text-ink-500">Last event: –</span>
+            </div>
+          </div>
+        </header>
+
+        <!-- Tabs -->
+        <div class="mt-6 border-b border-ink-200 text-sm">
+          <nav class="-mb-px flex flex-wrap gap-4" aria-label="Store sections">
+            <button data-tab="devices" class="store-tab border-b-2 border-ink-900 pb-2 font-medium text-ink-900">Devices</button>
+            <button data-tab="menu" class="store-tab border-b-2 border-transparent pb-2 font-medium text-ink-600 hover:text-ink-900">Menu</button>
+            <button data-tab="orders" class="store-tab border-b-2 border-transparent pb-2 font-medium text-ink-600 hover:text-ink-900">Orders</button>
+            <button data-tab="commands" class="store-tab border-b-2 border-transparent pb-2 font-medium text-ink-600 hover:text-ink-900">Command Center</button>
+          </nav>
+        </div>
+
+        <!-- Tab panels -->
+        <section id="tab-devices" class="mt-6">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-sm font-semibold text-ink-900">Devices &amp; activation codes</h2>
+            <button id="refresh-devices-btn" class="btn-secondary text-xs">Refresh</button>
+          </div>
+          <div class="mt-3 grid gap-4 lg:grid-cols-3">
+            <div class="card lg:col-span-2">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-ink-500">Devices</h3>
+              <div class="mt-3 overflow-hidden rounded-xl border border-ink-100">
+                <table class="min-w-full divide-y divide-ink-100 text-xs">
+                  <thead class="bg-ink-50 text-ink-500">
+                    <tr>
+                      <th class="px-3 py-1 text-left font-medium">Name</th>
+                      <th class="px-3 py-1 text-left font-medium">Role</th>
+                      <th class="px-3 py-1 text-left font-medium">Status</th>
+                      <th class="px-3 py-1 text-left font-medium">Last seen</th>
+                    </tr>
+                  </thead>
+                  <tbody id="store-devices-body" class="divide-y divide-ink-100 bg-white"></tbody>
+                </table>
+                <p id="store-devices-empty" class="px-3 py-4 text-center text-xs text-ink-500">
+                  No devices yet. Create an activation code below, then enter it on the till (Settings → Cloud).
+                </p>
+              </div>
+            </div>
+
+            <div class="card">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-ink-500">Activation codes</h3>
+              <p class="mt-1 text-xs text-ink-600">Codes for this store. Create one, then type or paste it into the till.</p>
+              <button id="issue-key-btn" class="mt-2 btn-secondary w-full text-xs">Create new activation code</button>
+              <div class="mt-3 max-h-64 space-y-2 overflow-y-auto text-xs" id="store-keys-list"></div>
+              <p id="store-keys-empty" class="mt-2 text-xs text-ink-500">
+                No codes yet. Click &quot;Create new activation code&quot; above. Give the code to staff to enter on the till.
+              </p>
+            </div>
+          </div>
+        </section>
+
+        <section id="tab-menu" class="mt-6 hidden">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-sm font-semibold text-ink-900">Menu &amp; availability</h2>
+            <button id="refresh-menu-btn" class="btn-secondary text-xs">Refresh</button>
+          </div>
+          <div class="mt-4 grid gap-4 lg:grid-cols-[240px,minmax(0,1fr)]">
+            <aside class="card">
+              <h3 class="text-xs font-semibold uppercase tracking-wide text-ink-500">Categories</h3>
+              <ul id="menu-categories" class="mt-3 space-y-1 text-sm"></ul>
+              <p id="menu-categories-empty" class="mt-3 text-xs text-ink-500">
+                No menu categories synced yet. Once POS pushes menu events, they will appear here.
+              </p>
+            </aside>
+            <div class="card">
+              <div class="flex items-center justify-between gap-2">
+                <div>
+                  <h3 id="menu-category-name" class="text-sm font-semibold text-ink-900">Items</h3>
+                  <p id="menu-category-meta" class="mt-0.5 text-xs text-ink-500">Select a category to view items.</p>
+                </div>
+              </div>
+              <input type="file" id="menu-item-image-input" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" />
+              <div id="menu-items-list" class="mt-3 divide-y divide-ink-100"></div>
+              <p id="menu-items-empty" class="mt-3 text-xs text-ink-500">No items for this category.</p>
+            </div>
+          </div>
+        </section>
+
+        <section id="tab-orders" class="mt-6 hidden">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-sm font-semibold text-ink-900">Orders</h2>
+            <button id="refresh-orders-btn" class="btn-secondary text-xs">Refresh</button>
+          </div>
+          <div class="mt-3 overflow-hidden rounded-xl border border-ink-200 bg-white">
+            <table class="min-w-full divide-y divide-ink-100 text-xs">
+              <thead class="bg-ink-50 text-ink-500">
+                <tr>
+                  <th class="px-3 py-1 text-left font-medium">Order</th>
+                  <th class="px-3 py-1 text-left font-medium">Status</th>
+                  <th class="px-3 py-1 text-right font-medium">Total</th>
+                  <th class="px-3 py-1 text-left font-medium">Occurred at</th>
+                  <th class="px-3 py-1 text-right font-medium"></th>
+                </tr>
+              </thead>
+              <tbody id="store-orders-body" class="divide-y divide-ink-100 bg-white"></tbody>
+            </table>
+            <p id="store-orders-empty" class="px-3 py-4 text-center text-xs text-ink-500">
+              No orders yet. When POS devices sync, orders will appear here.
+            </p>
+          </div>
+        </section>
+
+        <section id="tab-commands" class="mt-6 hidden">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-sm font-semibold text-ink-900">Command Center</h2>
+            <button id="refresh-commands-btn" class="btn-secondary text-xs">Refresh</button>
+          </div>
+          <p class="mt-2 text-xs text-ink-600">
+            Enqueue void and refund commands for orders. This is a read-only view for now; enqueuing can be added on the order detail page.
+          </p>
+          <div class="mt-3 overflow-hidden rounded-xl border border-ink-200 bg-white">
+            <table class="min-w-full divide-y divide-ink-100 text-xs">
+              <thead class="bg-ink-50 text-ink-500">
+                <tr>
+                  <th class="px-3 py-1 text-left font-medium">Command</th>
+                  <th class="px-3 py-1 text-left font-medium">Order</th>
+                  <th class="px-3 py-1 text-left font-medium">Status</th>
+                  <th class="px-3 py-1 text-left font-medium">Device</th>
+                  <th class="px-3 py-1 text-left font-medium">Created</th>
+                </tr>
+              </thead>
+              <tbody id="store-commands-body" class="divide-y divide-ink-100 bg-white"></tbody>
+            </table>
+            <p id="store-commands-empty" class="px-3 py-4 text-center text-xs text-ink-500">
+              No commands queued yet. They will appear here when created from the portal.
+            </p>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <script>
+    function getQueryParam(name) {
+      const params = new URLSearchParams(window.location.search);
+      return params.get(name);
+    }
+
+    function setUserName(name) {
+      document.getElementById('user-name').textContent = name;
+      document.getElementById('user-name-mobile').textContent = name;
+    }
+
+    function formatDateTime(value) {
+      if (!value) return '–';
+      return value.replace('T', ' ');
+    }
+    function formatFriendlyDateTime(value) {
+      if (!value) return '–';
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return value;
+      const now = new Date();
+      const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+      const yesterday = new Date(today);
+      yesterday.setDate(yesterday.getDate() - 1);
+      const day = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      const time = d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: true });
+      const dateStr = d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined });
+      if (day.getTime() === today.getTime()) return 'Today ' + time;
+      if (day.getTime() === yesterday.getTime()) return 'Yesterday ' + time;
+      return dateStr + ', ' + time;
+    }
+
+    function formatMoney(cents) {
+      if (cents == null) return '–';
+      const value = (cents / 100).toFixed(2);
+      return '£' + value;
+    }
+
+    function switchTab(tabId) {
+      document.querySelectorAll('.store-tab').forEach((btn) => {
+        const active = btn.dataset.tab === tabId;
+        btn.className = 'store-tab border-b-2 pb-2 font-medium ' + (active ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-600 hover:text-ink-900');
+      });
+      ['devices', 'menu', 'orders', 'commands'].forEach((id) => {
+        const panel = document.getElementById('tab-' + id);
+        if (!panel) return;
+        panel.classList.toggle('hidden', id !== tabId);
+      });
+    }
+
+    function shortId(uuid) {
+      if (!uuid || typeof uuid !== 'string') return '—';
+      return uuid.replace(/-/g, '').slice(0, 8);
+    }
+    async function loadStoreHeader(storeId) {
+      const res = await fetch(`/api/portal/stores/${encodeURIComponent(storeId)}/meta`);
+      if (!res.ok) {
+        document.getElementById('store-name').textContent = 'Store ' + shortId(storeId);
+        document.getElementById('store-subtitle').textContent = 'Store ' + shortId(storeId);
+        return;
+      }
+      const data = await res.json();
+      window.currentStoreMeta = data;
+      document.getElementById('store-name').textContent = data.name;
+      document.getElementById('store-subtitle').innerHTML = `Store <code class="rounded bg-ink-100 px-1 text-[11px]" title="${(data.id || '').replace(/"/g, '&quot;')}">${shortId(data.id)}</code>`;
+    }
+
+    async function loadDevices(storeId) {
+      const res = await fetch(`/api/portal/stores/${encodeURIComponent(storeId)}/devices`);
+      if (!res.ok) throw new Error('Failed to load devices');
+      const data = await res.json();
+      const body = document.getElementById('store-devices-body');
+      const empty = document.getElementById('store-devices-empty');
+      body.innerHTML = '';
+      const devices = data.devices || [];
+      if (devices.length === 0) {
+        empty.classList.remove('hidden');
+      } else {
+        empty.classList.add('hidden');
+        for (const d of devices) {
+          const name = d.device_name || d.device_label || ('Device ' + (d.id || '').slice(0, 8));
+          const primaryBadge = d.is_primary ? '<span class="inline-flex rounded-full bg-traqr-50 px-2 py-0.5 text-[11px] font-medium text-traqr-700">Primary</span>' : '<span class="text-ink-400 text-[11px]">—</span>';
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="px-3 py-2 align-top text-ink-800">${name}</td>
+            <td class="px-3 py-2 align-top text-xs">${primaryBadge}</td>
+            <td class="px-3 py-2 align-top text-xs">
+              <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                d.status === 'active'
+                  ? 'bg-emerald-50 text-emerald-700'
+                  : 'bg-ink-50 text-ink-600'
+              }">${d.status}</span>
+            </td>
+            <td class="px-3 py-2 align-top text-xs text-ink-500">${formatFriendlyDateTime(d.last_seen_at)}</td>
+          `;
+          body.appendChild(tr);
+        }
+      }
+    }
+
+    async function loadActivationKeys(storeId) {
+      const res = await fetch(`/api/portal/stores/${encodeURIComponent(storeId)}/activation-keys`);
+      if (!res.ok) throw new Error('Failed to load activation keys');
+      const data = await res.json();
+      const list = document.getElementById('store-keys-list');
+      const empty = document.getElementById('store-keys-empty');
+      list.innerHTML = '';
+      const keys = data.keys || [];
+      if (keys.length === 0) {
+        empty.classList.remove('hidden');
+      } else {
+        empty.classList.add('hidden');
+        for (const k of keys) {
+          const div = document.createElement('div');
+          const statusLabel = k.revoked_at
+            ? 'Revoked'
+            : k.expires_at && new Date(k.expires_at) < new Date()
+              ? 'Expired'
+              : 'Active';
+          const statusClass = k.revoked_at
+            ? 'bg-rose-50 text-rose-700'
+            : k.expires_at && new Date(k.expires_at) < new Date()
+              ? 'bg-amber-50 text-amber-700'
+              : 'bg-emerald-50 text-emerald-700';
+          div.className = 'rounded-lg border border-ink-100 bg-ink-50/60 p-2';
+          div.innerHTML = `
+            <div class="flex items-center justify-between gap-2">
+              <div class="text-[11px] text-ink-700">
+                <div class="font-medium">${k.scope_type} scope</div>
+                <div class="text-ink-500">Uses: ${k.uses_count}${k.max_uses ? ' / ' + k.max_uses : ''}</div>
+              </div>
+              <span class="inline-flex rounded-full px-2 py-0.5 text-[10px] font-medium ${statusClass}">${statusLabel}</span>
+            </div>
+            <div class="mt-1 text-[10px] text-ink-500">
+              Expires: ${k.expires_at ? formatFriendlyDateTime(k.expires_at) : 'No expiry'}
+            </div>
+          `;
+          list.appendChild(div);
+        }
+      }
+    }
+
+    async function loadMenu(storeId, categoryId) {
+      const url = new URL(window.location.origin + `/api/portal/stores/${encodeURIComponent(storeId)}/menu`);
+      if (categoryId) {
+        url.searchParams.set('category_id', categoryId);
+      }
+      url.searchParams.set('_', String(Date.now()));
+      const res = await fetch(url.toString().replace(window.location.origin, ''), { credentials: 'include', cache: 'no-store' });
+      if (!res.ok) throw new Error('Failed to load menu');
+      const data = await res.json();
+      const categories = data.categories || [];
+      const items = data.items || [];
+
+      const catList = document.getElementById('menu-categories');
+      const catEmpty = document.getElementById('menu-categories-empty');
+      catList.innerHTML = '';
+      if (categories.length === 0) {
+        catEmpty.classList.remove('hidden');
+      } else {
+        catEmpty.classList.add('hidden');
+        for (const c of categories) {
+          const li = document.createElement('li');
+          li.innerHTML = `
+            <button type="button" class="flex w-full items-center justify-between rounded-lg px-3 py-1.5 text-left text-sm hover:bg-ink-50" data-category-id="${c.id}">
+              <span>${c.name}</span>
+            </button>
+          `;
+          const btn = li.querySelector('button');
+          btn.addEventListener('click', () => {
+            loadMenu(storeId, c.id).catch(err => {
+              console.error(err);
+              alert('Failed to load category.');
+            });
+          });
+          catList.appendChild(li);
+        }
+      }
+
+      const itemsList = document.getElementById('menu-items-list');
+      const itemsEmpty = document.getElementById('menu-items-empty');
+      const catName = document.getElementById('menu-category-name');
+      const catMeta = document.getElementById('menu-category-meta');
+
+      if (categories.length > 0) {
+        const selected = categories.find(c => c.id === (categoryId || (categories[0] && categories[0].id))) || categories[0];
+        catName.textContent = selected ? selected.name : 'Items';
+        catMeta.textContent = selected ? `Category • ${selected.position}` : 'Select a category to view items.';
+      } else if (items.length > 0) {
+        catName.textContent = 'All items';
+        catMeta.textContent = 'Items synced from POS (no categories yet).';
+      } else {
+        catName.textContent = 'Items';
+        catMeta.textContent = 'Select a category to view items.';
+      }
+
+      itemsList.innerHTML = '';
+      if (items.length === 0) {
+        itemsEmpty.classList.remove('hidden');
+      } else {
+        itemsEmpty.classList.add('hidden');
+        for (const it of items) {
+          const badge = it.active
+            ? '<span class="inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">Active</span>'
+            : '<span class="inline-flex rounded-full bg-ink-50 px-2 py-0.5 text-[11px] font-medium text-ink-600">Hidden</span>';
+          const modifiers = it.has_modifiers
+            ? '<span class="ml-2 inline-flex rounded-full bg-ink-50 px-2 py-0.5 text-[10px] font-medium text-ink-600">Modifiers</span>'
+            : '';
+          const yieldInfo =
+            it.remaining != null || it.estimated_total != null
+              ? `<div class="mt-1 text-[11px] text-ink-500">Yield: ${it.remaining != null ? it.remaining : '–'} / ${it.estimated_total != null ? it.estimated_total : '–'}${it.warning_threshold != null ? ' (warn at ' + it.warning_threshold + ')' : ''}</div>`
+              : '';
+          const imgSrc = (function () {
+            const p = it.image_path;
+            if (!p || typeof p !== 'string') return '';
+            if (/^https?:\/\//i.test(p)) return p;
+            const rel = String(p).replace(/^\//, '').trim();
+            return rel.startsWith('uploads/') ? '/' + rel : '/uploads/' + rel;
+          })();
+          const imgOrPlaceholder = imgSrc
+            ? `<img src="${imgSrc.replace(/"/g, '&quot;')}" alt="" class="h-10 w-10 rounded-lg object-cover ring-1 ring-ink-200" onerror="this.style.display='none'" />`
+            : '<button type="button" class="menu-item-add-image h-10 w-10 rounded-lg border border-dashed border-ink-300 bg-ink-50 text-[10px] text-ink-500 hover:border-traqr-400 hover:bg-traqr-50 hover:text-traqr-700" data-store-id="' + (storeId || '').replace(/"/g, '&quot;') + '" data-item-id="' + (it.id || '').replace(/"/g, '&quot;') + '" title="Add image">+ Image</button>';
+          const row = document.createElement('div');
+          row.className = 'flex items-start gap-3 px-3 py-2';
+          row.innerHTML = `
+            <div class="h-10 w-10 shrink-0 flex items-center justify-center overflow-hidden rounded-lg bg-ink-50">${imgOrPlaceholder}</div>
+            <div class="flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <div>
+                  <div class="text-sm font-medium text-ink-900">${it.name}</div>
+                  <div class="mt-0.5 text-xs text-ink-600">${it.description || ''}</div>
+                  ${yieldInfo}
+                </div>
+                <div class="text-right text-xs text-ink-800">
+                  <div class="font-semibold">${formatMoney(it.price_pence)}</div>
+                  <div class="mt-1">${badge}${modifiers}</div>
+                </div>
+              </div>
+            </div>
+          `;
+          itemsList.appendChild(row);
+        }
+      }
+    }
+
+    async function loadOrders(storeId) {
+      const res = await fetch(`/api/portal/stores/${encodeURIComponent(storeId)}/orders`);
+      if (!res.ok) throw new Error('Failed to load orders');
+      const data = await res.json();
+      const orders = data.orders || [];
+      const body = document.getElementById('store-orders-body');
+      const empty = document.getElementById('store-orders-empty');
+      body.innerHTML = '';
+      if (orders.length === 0) {
+        empty.classList.remove('hidden');
+      } else {
+        empty.classList.add('hidden');
+        for (const o of orders) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="px-3 py-2 align-top font-mono text-[11px] text-ink-700">${o.local_order_id}</td>
+            <td class="px-3 py-2 align-top text-xs">
+              <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                o.status === 'open'
+                  ? 'bg-amber-50 text-amber-800'
+                  : 'bg-emerald-50 text-emerald-800'
+              }">${o.status}</span>
+            </td>
+            <td class="px-3 py-2 align-top text-right text-ink-900">${formatMoney(o.total_cents)}</td>
+            <td class="px-3 py-2 align-top text-xs text-ink-500">${formatFriendlyDateTime(o.occurred_at)}</td>
+            <td class="px-3 py-2 align-top text-right">
+              <a href="/order?order_id=${encodeURIComponent(o.id)}" class="text-[11px] font-medium text-traqr-600 hover:text-traqr-500">View</a>
+            </td>
+          `;
+          body.appendChild(tr);
+        }
+      }
+    }
+
+    async function loadCommands(storeId) {
+      const res = await fetch(`/api/portal/stores/${encodeURIComponent(storeId)}/commands`);
+      if (!res.ok) throw new Error('Failed to load commands');
+      const data = await res.json();
+      const commands = data.commands || [];
+      const body = document.getElementById('store-commands-body');
+      const empty = document.getElementById('store-commands-empty');
+      body.innerHTML = '';
+      if (commands.length === 0) {
+        empty.classList.remove('hidden');
+      } else {
+        empty.classList.add('hidden');
+        for (const c of commands) {
+          const tr = document.createElement('tr');
+          tr.innerHTML = `
+            <td class="px-3 py-2 align-top text-xs text-ink-800">${c.command_type}${c.sensitive ? ' · sensitive' : ''}</td>
+            <td class="px-3 py-2 align-top font-mono text-[11px] text-ink-700">${c.local_order_id || '—'}</td>
+            <td class="px-3 py-2 align-top text-xs text-ink-700">${c.status}</td>
+            <td class="px-3 py-2 align-top font-mono text-[11px] text-ink-500">${c.device_id}</td>
+            <td class="px-3 py-2 align-top text-xs text-ink-500">${formatFriendlyDateTime(c.created_at)}</td>
+          `;
+          body.appendChild(tr);
+        }
+      }
+    }
+
+    async function init() {
+      const storeId = getQueryParam('store_id');
+      if (!storeId) {
+        alert('Missing store_id in URL');
+        return;
+      }
+      try {
+        const storedName = window.localStorage.getItem('traqr_display_name');
+        if (storedName) setUserName(storedName);
+      } catch (_) {}
+
+      document.querySelectorAll('.store-tab').forEach((btn) => {
+        btn.addEventListener('click', () => {
+          const tab = btn.dataset.tab;
+          switchTab(tab);
+          if (tab === 'menu') {
+            loadMenu(storeId).catch(err => {
+              console.error(err);
+              alert('Failed to load menu.');
+            });
+          } else if (tab === 'orders') {
+            loadOrders(storeId).catch(err => {
+              console.error(err);
+              alert('Failed to load orders.');
+            });
+          } else if (tab === 'commands') {
+            loadCommands(storeId).catch(err => {
+              console.error(err);
+              alert('Failed to load commands.');
+            });
+          }
+        });
+      });
+      document.getElementById('refresh-devices-btn').addEventListener('click', () => {
+        loadDevices(storeId).catch(err => {
+          console.error(err);
+          alert('Failed to refresh devices. Check API logs.');
+        });
+        loadActivationKeys(storeId).catch(err => {
+          console.error(err);
+          alert('Failed to refresh activation keys.');
+        });
+      });
+      document.getElementById('issue-key-btn').addEventListener('click', async () => {
+        if (!window.currentStoreMeta) {
+          alert('Store metadata not loaded yet.');
+          return;
+        }
+        if (!confirm('Create a new activation code for this store? You’ll see it once — copy it and enter it on the till.')) {
+          return;
+        }
+        try {
+          const res = await fetch('/api/admin/activation-keys', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              org_id: window.currentStoreMeta.org_id,
+              store_id: window.currentStoreMeta.id,
+              scope_type: 'store',
+              scope_id: window.currentStoreMeta.id,
+              max_uses: 5
+            })
+          });
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || 'Failed to issue activation key');
+          }
+          const data = await res.json();
+          const key = data.activation_key;
+          alert('Activation code (copy this into the till → Settings → Cloud):\n\n' + key + '\n\nTip: copy the text above so staff can paste it on the till.');
+          await loadActivationKeys(storeId);
+        } catch (err) {
+          console.error(err);
+          alert('Could not create activation code. Try again or check with your admin.');
+        }
+      });
+      document.getElementById('refresh-menu-btn').addEventListener('click', () => {
+        loadMenu(storeId).catch(err => {
+          console.error(err);
+          alert('Failed to refresh menu.');
+        });
+      });
+      document.getElementById('menu-items-list').addEventListener('click', function (e) {
+        const btn = e.target.closest('.menu-item-add-image');
+        if (!btn) return;
+        e.preventDefault();
+        menuItemImagePending = { storeId: btn.getAttribute('data-store-id'), itemId: btn.getAttribute('data-item-id') };
+        document.getElementById('menu-item-image-input').click();
+      });
+      document.getElementById('menu-item-image-input').addEventListener('change', async function () {
+        if (!menuItemImagePending || !this.files || !this.files[0]) {
+          menuItemImagePending = null;
+          this.value = '';
+          return;
+        }
+        const fd = new FormData();
+        fd.append('file', this.files[0]);
+        try {
+          const r = await fetch('/api/portal/stores/' + encodeURIComponent(menuItemImagePending.storeId) + '/menu/items/' + encodeURIComponent(menuItemImagePending.itemId) + '/upload-image', { method: 'POST', credentials: 'include', body: fd });
+          if (!r.ok) throw new Error(await r.text());
+          await loadMenu(menuItemImagePending.storeId);
+        } catch (err) {
+          console.error(err);
+          alert('Failed to upload image.');
+        }
+        menuItemImagePending = null;
+        this.value = '';
+      });
+      document.getElementById('refresh-orders-btn').addEventListener('click', () => {
+        loadOrders(storeId).catch(err => {
+          console.error(err);
+          alert('Failed to refresh orders.');
+        });
+      });
+      document.getElementById('refresh-commands-btn').addEventListener('click', () => {
+        loadCommands(storeId).catch(err => {
+          console.error(err);
+          alert('Failed to refresh commands.');
+        });
+      });
+
+      await loadStoreHeader(storeId);
+      await loadDevices(storeId);
+      await loadActivationKeys(storeId);
+
+      const hash = (window.location.hash || '').replace('#', '');
+      if (['devices', 'menu', 'orders', 'commands'].includes(hash)) {
+        switchTab(hash);
+        if (hash === 'menu') loadMenu(storeId).catch(() => {});
+        else if (hash === 'orders') loadOrders(storeId).catch(() => {});
+        else if (hash === 'commands') loadCommands(storeId).catch(() => {});
+      }
+    }
+
+    init().catch(err => console.error(err));
+  </script>
+</body>
+</html>
+

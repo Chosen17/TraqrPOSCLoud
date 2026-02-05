@@ -383,6 +383,22 @@ pub async fn update_pos_menu_item_image_by_id(
     Ok(res.rows_affected() > 0)
 }
 
+/// Update menu category image by cloud row id (for portal uploads).
+pub async fn update_pos_menu_category_image_by_id(
+    pool: &MySqlPool,
+    category_id: Uuid,
+    image_path: &str,
+) -> Result<bool, sqlx::Error> {
+    let res = sqlx::query(
+        "UPDATE pos_menu_categories SET image_path = ?, updated_at = CURRENT_TIMESTAMP(3) WHERE id = ?",
+    )
+    .bind(image_path)
+    .bind(category_id.to_string())
+    .execute(pool)
+    .await?;
+    Ok(res.rows_affected() > 0)
+}
+
 // ---------- Menu item modifiers (replace all for item) ----------
 
 pub async fn delete_pos_menu_item_modifiers(

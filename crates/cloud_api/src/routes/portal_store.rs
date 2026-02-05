@@ -10,7 +10,8 @@ use uuid::Uuid;
 
 use crate::state::AppState;
 use db::{
-    enqueue_apply_menu_for_store, update_pos_menu_category_by_id, update_pos_menu_item_by_id,
+    enqueue_apply_menu_for_store, update_pos_menu_category_by_id,
+    update_pos_menu_category_image_by_id, update_pos_menu_item_by_id,
     update_pos_menu_item_image_by_id,
 };
 
@@ -115,6 +116,10 @@ pub fn router(_state: AppState) -> Router<AppState> {
         .route(
             "/portal/stores/:store_id/menu/items/:item_id/upload-image",
             post(upload_store_menu_item_image),
+        )
+        .route(
+            "/portal/stores/:store_id/menu/categories/:category_id/upload-image",
+            post(upload_store_menu_category_image),
         )
         .route(
             "/portal/stores/:store_id/menu/categories/:category_id",
@@ -567,6 +572,107 @@ async fn upload_store_menu_item_image(
 
     let relative_path = format!("menu/{}", filename);
     update_pos_menu_item_image_by_id(db, item_uuid, &relative_path)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    let _ = enqueue_apply_menu_for_store(db, store_uuid).await;
+
+    Ok(Json(serde_json::json!({
+        "url": format!("/uploads/{}", relative_path),
+        "path": relative_path
+    })))
+}
+
+async fn upload_store_menu_category_image(
+    State(state): State<AppState>,
+    Path((store_id, category_id)): Path<(String, String)>,
+    mut multipart: Multipart,
+) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
+    let db = state.db.as_ref().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "database not available".to_string(),
+    ))?;
+    let store_uuid = Uuid::parse_str(&store_id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "invalid store_id".to_string()))?;
+    let category_uuid = Uuid::parse_str(&category_id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "invalid category_id".to_string()))?;
+
+    let exists: Option<(i32,)> = sqlx::query_as(
+        r#"
+        SELECT 1 FROM pos_menu_categories c
+        JOIN device_sync_state d ON d.device_id = c.device_id AND d.store_id = ?
+        WHERE c.id = ?
+        "#,
+    )
+    .bind(store_uuid.to_string())
+    .bind(category_uuid.to_string())
+    .fetch_optional(db)
+    .await
+    .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if exists.is_none() {
+        return Err((
+            StatusCode::NOT_FOUND,
+            "menu category not found in this store".to_string(),
+        ));
+    }
+
+    let upload_dir = std::env::var("UPLOAD_DIR").unwrap_or_else(|_| "uploads".to_string());
+    let base = std::path::Path::new(&upload_dir);
+    let base = if base.is_relative() {
+        std::env::current_dir()
+            .unwrap_or_else(|_| std::path::PathBuf::from("."))
+            .join(base)
+    } else {
+        base.to_path_buf()
+    };
+    let menu_dir = base.join("menu");
+    let _ = tokio::fs::create_dir_all(&menu_dir).await;
+
+    let mut ext = "jpg".to_string();
+    let mut data = None;
+    while let Some(field) = multipart
+        .next_field()
+        .await
+        .map_err(|_| (StatusCode::BAD_REQUEST, "invalid multipart".to_string()))?
+    {
+        let name = field.name().unwrap_or("");
+        if name != "file" && name != "image" && field.file_name().is_none() {
+            continue;
+        }
+        if let Some(name) = field.file_name() {
+            ext = std::path::Path::new(name)
+                .extension()
+                .and_then(|e| e.to_str())
+                .filter(|e| matches!(*e, "jpg" | "jpeg" | "png" | "gif" | "webp"))
+                .unwrap_or("jpg")
+                .to_string();
+        }
+        let bytes = field
+            .bytes()
+            .await
+            .map_err(|_| (StatusCode::BAD_REQUEST, "failed to read file".to_string()))?
+            .to_vec();
+        if bytes.len() > 5 * 1024 * 1024 {
+            return Err((
+                StatusCode::PAYLOAD_TOO_LARGE,
+                "file too large (max 5MB)".to_string(),
+            ));
+        }
+        data = Some(bytes);
+        break;
+    }
+    let data = data.ok_or((
+        StatusCode::BAD_REQUEST,
+        "missing file field (file or image)".to_string(),
+    ))?;
+
+    let filename = format!("{}.{}", uuid::Uuid::new_v4(), ext);
+    let path = menu_dir.join(&filename);
+    tokio::fs::write(&path, &data)
+        .await
+        .map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "failed to save file".to_string()))?;
+
+    let relative_path = format!("menu/{}", filename);
+    update_pos_menu_category_image_by_id(db, category_uuid, &relative_path)
         .await
         .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
     let _ = enqueue_apply_menu_for_store(db, store_uuid).await;

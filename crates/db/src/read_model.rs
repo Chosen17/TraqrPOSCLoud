@@ -4,12 +4,21 @@
 use sqlx::{MySqlPool, Row};
 use uuid::Uuid;
 
-use crate::device::update_device_name_primary;
+use crate::device::{is_device_canonical_for_store, update_device_name_primary};
+use crate::sync::insert_device_config_alert;
 
 // ---------- Store sync ----------
 
-/// Pick a device_id that has synced for this store (for canonical menu). Returns None if no device has synced yet.
+/// Pick a device_id that has synced for this store (for canonical menu). If a
+/// canonical_device_id is set on the store, that device is used; otherwise we
+/// fall back to the most recently synced device. Returns None if no device has
+/// synced yet.
 pub async fn get_device_id_for_store(pool: &MySqlPool, store_id: Uuid) -> Result<Option<Uuid>, sqlx::Error> {
+    // Prefer an explicit canonical device if the store has one configured.
+    if let Some(canonical_id) = crate::device::get_canonical_device_for_store(pool, store_id).await? {
+        return Ok(Some(canonical_id));
+    }
+
     let row: Option<(String,)> = sqlx::query_as(
         r#"
         SELECT device_id FROM device_sync_state WHERE store_id = ? ORDER BY updated_at DESC LIMIT 1
@@ -153,6 +162,35 @@ pub async fn ensure_pos_menu(
 
 // ---------- Menu categories ----------
 
+/// Create a new menu category from the cloud (portal). Returns the new row id.
+pub async fn create_pos_menu_category(
+    pool: &MySqlPool,
+    org_id: Uuid,
+    device_id: Uuid,
+    local_menu_id: &str,
+    name: &str,
+    position: i32,
+) -> Result<Uuid, sqlx::Error> {
+    let id = Uuid::new_v4();
+    let local_category_id = format!("cloud-{}", Uuid::new_v4());
+    sqlx::query(
+        r#"
+        INSERT INTO pos_menu_categories (id, org_id, device_id, local_menu_id, local_category_id, name, position, image_path)
+        VALUES (?, ?, ?, ?, ?, ?, ?, NULL)
+        "#,
+    )
+    .bind(id.to_string())
+    .bind(org_id.to_string())
+    .bind(device_id.to_string())
+    .bind(local_menu_id)
+    .bind(&local_category_id)
+    .bind(name)
+    .bind(position)
+    .execute(pool)
+    .await?;
+    Ok(id)
+}
+
 pub async fn upsert_pos_menu_category(
     pool: &MySqlPool,
     org_id: Uuid,
@@ -183,6 +221,45 @@ pub async fn upsert_pos_menu_category(
 }
 
 // ---------- Menu items ----------
+
+/// Create a new menu item from the cloud (portal). Returns the new row id.
+pub async fn create_pos_menu_item(
+    pool: &MySqlPool,
+    org_id: Uuid,
+    device_id: Uuid,
+    local_item_id: &str,
+    local_store_id: Option<&str>,
+    local_category_id: Option<&str>,
+    name: &str,
+    description: Option<&str>,
+    price_pence: Option<i64>,
+    active: bool,
+    image_path: Option<&str>,
+    customer_editable: bool,
+) -> Result<Uuid, sqlx::Error> {
+    let id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO pos_menu_items (id, org_id, device_id, local_item_id, local_store_id, local_category_id, name, description, price_pence, active, image_path, customer_editable)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        "#,
+    )
+    .bind(id.to_string())
+    .bind(org_id.to_string())
+    .bind(device_id.to_string())
+    .bind(local_item_id)
+    .bind(local_store_id)
+    .bind(local_category_id)
+    .bind(name)
+    .bind(description)
+    .bind(price_pence)
+    .bind(active)
+    .bind(image_path)
+    .bind(customer_editable)
+    .execute(pool)
+    .await?;
+    Ok(id)
+}
 
 pub async fn upsert_pos_menu_item(
     pool: &MySqlPool,
@@ -501,6 +578,49 @@ pub async fn project_event_to_read_model(
     event_body: &serde_json::Value,
     _occurred_at: chrono::DateTime<chrono::Utc>,
 ) -> Result<(), sqlx::Error> {
+    // Enforce that menu and configuration updates originate from the canonical
+    // device for the store. If a non-canonical device attempts to change these,
+    // we skip the projection, log a warning, and record an alert row so the
+    // portal can surface it later.
+    let is_config_event = matches!(
+        event_type,
+        "store_updated"
+            | "menu_category_created"
+            | "menu_category_renamed"
+            | "menu_category_image"
+            | "menu_item_created"
+            | "menu_item_deleted"
+            | "menu_item_visibility"
+            | "menu_item_image"
+            | "menu_item_modifiers_set"
+            | "dish_yield_upserted"
+            | "dish_yield_adjusted"
+    );
+
+    if is_config_event {
+        let is_canonical = is_device_canonical_for_store(pool, store_id, device_id).await?;
+        if !is_canonical {
+            let details = serde_json::to_string(event_body).ok();
+            tracing::warn!(
+                "non-canonical device attempted config update: org_id={}, store_id={}, device_id={}, event_type={}",
+                org_id,
+                store_id,
+                device_id,
+                event_type
+            );
+            let _ = insert_device_config_alert(
+                pool,
+                org_id,
+                store_id,
+                device_id,
+                event_type,
+                details.as_deref(),
+            )
+            .await;
+            return Ok(());
+        }
+    }
+
     match event_type {
         "store_updated" => {
             let local_store_id = event_body.get("store_id").and_then(|v| v.as_str()).unwrap_or("");

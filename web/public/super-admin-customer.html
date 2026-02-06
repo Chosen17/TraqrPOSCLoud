@@ -150,9 +150,11 @@
         errorEl.classList.remove('hidden');
         return;
       }
-      const res = await fetch('/api/portal/orgs/' + encodeURIComponent(orgId));
+      const res = await fetch('/api/portal/super/orgs/' + encodeURIComponent(orgId), { credentials: 'include' });
       if (!res.ok) {
-        errorEl.textContent = res.status === 404 ? 'Customer not found.' : 'Failed to load customer.';
+        const body = await res.text();
+        const msg = res.status === 404 ? 'Customer not found.' : (body || 'Failed to load customer.');
+        errorEl.textContent = msg;
         errorEl.classList.remove('hidden');
         return;
       }
@@ -253,7 +255,12 @@
       }
     }
 
-    (function init() {
+    (async function init() {
+      const checkRes = await fetch('/api/portal/super/check', { credentials: 'include' });
+      if (!checkRes.ok) {
+        window.location.href = '/dashboard';
+        return;
+      }
       try {
         const n = window.localStorage.getItem('traqr_display_name');
         if (n) setUserName(n);

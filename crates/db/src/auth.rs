@@ -1,6 +1,7 @@
 //! Portal login: lookup user by email, verify password with bcrypt.
 
 use sqlx::MySqlPool;
+use uuid::Uuid;
 
 /// User row returned on successful login.
 #[derive(Debug, sqlx::FromRow)]
@@ -117,4 +118,95 @@ pub async fn get_user_id_by_session_token(
     .fetch_optional(pool)
     .await?;
     Ok(row.map(|r| r.0))
+}
+
+/// Create a new cloud user with hashed password. Returns user_id.
+pub async fn create_cloud_user(
+    pool: &MySqlPool,
+    email: &str,
+    password: &str,
+    display_name: Option<&str>,
+) -> Result<String, sqlx::Error> {
+    let id = Uuid::new_v4().to_string();
+    let hash = bcrypt::hash(password, bcrypt::DEFAULT_COST).map_err(|e| {
+        sqlx::Error::Protocol(format!("bcrypt hash error: {}", e).into())
+    })?;
+    sqlx::query(
+        r#"
+        INSERT INTO cloud_users (id, email, password_hash, display_name, status)
+        VALUES (?, ?, ?, ?, 'active')
+        "#,
+    )
+    .bind(&id)
+    .bind(email)
+    .bind(hash)
+    .bind(display_name)
+    .execute(pool)
+    .await?;
+    Ok(id)
+}
+
+/// Look up cloud_roles.id by code (e.g. "head_office_admin").
+pub async fn get_role_id_by_code(
+    pool: &MySqlPool,
+    code: &str,
+) -> Result<Option<String>, sqlx::Error> {
+    let row: Option<(String,)> =
+        sqlx::query_as("SELECT id FROM cloud_roles WHERE code = ?")
+            .bind(code)
+            .fetch_optional(pool)
+            .await?;
+    Ok(row.map(|r| r.0))
+}
+
+/// Create an org_membership row for the user and org with the given role code.
+pub async fn add_org_membership(
+    pool: &MySqlPool,
+    org_id: Uuid,
+    user_id: &str,
+    role_code: &str,
+) -> Result<(), sqlx::Error> {
+    if let Some(role_id) = get_role_id_by_code(pool, role_code).await? {
+        let id = Uuid::new_v4().to_string();
+        sqlx::query(
+            r#"
+            INSERT INTO org_memberships (id, org_id, user_id, franchise_id, role_id, status)
+            VALUES (?, ?, ?, NULL, ?, 'active')
+            "#,
+        )
+        .bind(&id)
+        .bind(org_id.to_string())
+        .bind(user_id)
+        .bind(role_id)
+        .execute(pool)
+        .await?;
+    }
+    Ok(())
+}
+
+/// Create a store_membership row for the user and store with the given role code.
+pub async fn add_store_membership(
+    pool: &MySqlPool,
+    org_id: Uuid,
+    store_id: Uuid,
+    user_id: &str,
+    role_code: &str,
+) -> Result<(), sqlx::Error> {
+    if let Some(role_id) = get_role_id_by_code(pool, role_code).await? {
+        let id = Uuid::new_v4().to_string();
+        sqlx::query(
+            r#"
+            INSERT INTO store_memberships (id, org_id, store_id, user_id, role_id, status)
+            VALUES (?, ?, ?, ?, ?, 'active')
+            "#,
+        )
+        .bind(&id)
+        .bind(org_id.to_string())
+        .bind(store_id.to_string())
+        .bind(user_id)
+        .bind(role_id)
+        .execute(pool)
+        .await?;
+    }
+    Ok(())
 }

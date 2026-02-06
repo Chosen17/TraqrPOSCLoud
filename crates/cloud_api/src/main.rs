@@ -1,3 +1,5 @@
+mod crypto;
+mod delivery_connectors;
 mod routes;
 mod session;
 mod state;
@@ -66,9 +68,10 @@ async fn main() {
         .route("/uploads/*path", get(serve_uploads))
         .fallback(serve_web);
 
-    let addr = "0.0.0.0:8080";
+    // Allow overriding bind address/port for local debugging (e.g. BIND_ADDR=0.0.0.0:8081).
+    let addr = std::env::var("BIND_ADDR").unwrap_or_else(|_| "0.0.0.0:8080".to_string());
     tracing::info!("listening on http://{}", addr);
-    let listener = tokio::net::TcpListener::bind(addr).await.unwrap();
+    let listener = tokio::net::TcpListener::bind(&addr).await.unwrap();
     axum::serve(listener, app).await.unwrap();
 }
 
@@ -266,4 +269,3 @@ async fn serve_web(request: Request) -> Response {
         .body(Body::from("Not found"))
         .unwrap()
 }
-

@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use uuid::Uuid;
 
+use crate::session::CurrentUser;
 use crate::state::AppState;
 use db::{reactivate_cloud_sync, suspend_cloud_sync};
 
@@ -40,6 +41,8 @@ pub struct StoreSummary {
     pub id: String,
     pub name: String,
     pub timezone: Option<String>,
+    /// Canonical (primary) device id for this store, if set.
+    pub canonical_device_id: Option<String>,
     pub device_count: i64,
     pub last_event_at: Option<String>,
 }
@@ -124,6 +127,7 @@ pub fn router(_state: AppState) -> Router<AppState> {
 
 async fn list_orgs(
     State(state): State<AppState>,
+    user: CurrentUser,
 ) -> Result<Json<OrgListResponse>, (StatusCode, String)> {
     let db = state.db.as_ref().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
@@ -132,6 +136,7 @@ async fn list_orgs(
 
     // We consider cloud_sync_active true if there is any active org_entitlement
     // for plan code 'cloud_sync'.
+    // Only return orgs the current user can access (membership or super_admin).
     let rows = sqlx::query(
         r#"
         SELECT
@@ -149,9 +154,22 @@ async fn list_orgs(
               AND (oe.valid_until IS NULL OR oe.valid_until > CURRENT_TIMESTAMP(3))
           ) AS cloud_sync_active
         FROM organizations o
+        WHERE EXISTS (
+          SELECT 1
+          FROM org_memberships om
+          WHERE om.org_id = o.id AND om.user_id = ? AND om.status = 'active'
+        )
+        OR EXISTS (
+          SELECT 1
+          FROM org_memberships om2
+          JOIN cloud_roles r2 ON r2.id = om2.role_id
+          WHERE om2.user_id = ? AND r2.code = 'super_admin' AND om2.status = 'active'
+        )
         ORDER BY o.created_at DESC
         "#,
     )
+    .bind(&user.0)
+    .bind(&user.0)
     .fetch_all(db)
     .await
     .map_err(internal)?;
@@ -174,17 +192,11 @@ async fn list_orgs(
     Ok(Json(OrgListResponse { organizations }))
 }
 
-async fn get_org_detail(
-    State(state): State<AppState>,
-    Path(OrgDetailParams { org_id }): Path<OrgDetailParams>,
-) -> Result<Json<OrgDetailResponse>, (StatusCode, String)> {
-    let db = state.db.as_ref().ok_or((
-        StatusCode::SERVICE_UNAVAILABLE,
-        "database not available".to_string(),
-    ))?;
-    let org_uuid = Uuid::parse_str(&org_id)
-        .map_err(|_| (StatusCode::BAD_REQUEST, "invalid org_id".to_string()))?;
-
+/// Fetch org detail by id (no auth). Used by get_org_detail and super-admin org detail.
+pub async fn fetch_org_detail_by_id(
+    db: &sqlx::MySqlPool,
+    org_uuid: Uuid,
+) -> Result<OrgDetailResponse, (StatusCode, String)> {
     let org_row = sqlx::query(
         r#"
         SELECT id, name, slug, created_at
@@ -242,6 +254,7 @@ async fn get_org_detail(
           s.id,
           s.name,
           s.timezone,
+          s.canonical_device_id,
           COALESCE(d.device_count, 0) AS device_count,
           es.last_event_at
         FROM stores s
@@ -272,6 +285,7 @@ async fn get_org_detail(
             id: row.get::<String, _>("id"),
             name: row.get::<String, _>("name"),
             timezone: row.get::<Option<String>, _>("timezone"),
+            canonical_device_id: row.get::<Option<String>, _>("canonical_device_id"),
             device_count: row.get::<i64, _>("device_count"),
             last_event_at: row
                 .get::<Option<chrono::NaiveDateTime>, _>("last_event_at")
@@ -279,7 +293,7 @@ async fn get_org_detail(
         })
         .collect();
 
-    Ok(Json(OrgDetailResponse {
+    Ok(OrgDetailResponse {
         id: org_row.get::<String, _>("id"),
         name: org_row.get::<String, _>("name"),
         slug: org_row.get::<Option<String>, _>("slug"),
@@ -289,11 +303,35 @@ async fn get_org_detail(
             .to_string(),
         entitlements,
         stores,
-    }))
+    })
+}
+
+async fn get_org_detail(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path(OrgDetailParams { org_id }): Path<OrgDetailParams>,
+) -> Result<Json<OrgDetailResponse>, (StatusCode, String)> {
+    let db = state.db.as_ref().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "database not available".to_string(),
+    ))?;
+    let org_uuid = Uuid::parse_str(&org_id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "invalid org_id".to_string()))?;
+
+    let allowed = db::user_can_access_org(db, &user.0, org_uuid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "organization not in your account".to_string()));
+    }
+
+    let data = fetch_org_detail_by_id(db, org_uuid).await?;
+    Ok(Json(data))
 }
 
 async fn get_store_devices(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(StoreParams { store_id }): Path<StoreParams>,
 ) -> Result<Json<StoreDevicesResponse>, (StatusCode, String)> {
     let db = state.db.as_ref().ok_or((
@@ -302,6 +340,13 @@ async fn get_store_devices(
     ))?;
     let store_uuid = Uuid::parse_str(&store_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid store_id".to_string()))?;
+
+    let allowed = db::user_can_access_store(db, &user.0, store_uuid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
 
     let rows = sqlx::query(
         r#"
@@ -348,6 +393,7 @@ async fn get_store_devices(
 
 async fn get_store_activation_keys(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(StoreParams { store_id }): Path<StoreParams>,
 ) -> Result<Json<StoreActivationKeysResponse>, (StatusCode, String)> {
     let db = state.db.as_ref().ok_or((
@@ -356,6 +402,13 @@ async fn get_store_activation_keys(
     ))?;
     let store_uuid = Uuid::parse_str(&store_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid store_id".to_string()))?;
+
+    let allowed = db::user_can_access_store(db, &user.0, store_uuid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
 
     let rows = sqlx::query(
         r#"

@@ -189,3 +189,84 @@ pub async fn enqueue_apply_menu_for_store(
     }
     Ok(count)
 }
+
+/// Enqueue a delivery_order command for the canonical device of the store (or first active device).
+pub async fn enqueue_delivery_order_command(
+    pool: &MySqlPool,
+    org_id: Uuid,
+    store_id: Uuid,
+    payload: &serde_json::Value,
+) -> Result<(), sqlx::Error> {
+    // Prefer canonical device if set.
+    let device_row: Option<(String,)> = sqlx::query_as(
+        r#"
+        SELECT
+          COALESCE(
+            (SELECT canonical_device_id FROM stores WHERE id = ?),
+            (SELECT device_id FROM device_sync_state WHERE store_id = ? ORDER BY updated_at DESC LIMIT 1)
+          ) AS device_id
+        "#,
+    )
+    .bind(store_id.to_string())
+    .bind(store_id.to_string())
+    .fetch_optional(pool)
+    .await?;
+
+    let Some((device_id,)) = device_row else {
+        return Ok(());
+    };
+
+    let command_id = Uuid::new_v4();
+    sqlx::query(
+        r#"
+        INSERT INTO device_command_queue (
+          command_id,
+          org_id,
+          store_id,
+          device_id,
+          command_type,
+          command_body,
+          status,
+          sensitive,
+          created_at
+        )
+        VALUES (?, ?, ?, ?, 'delivery_order', ?, 'queued', 0, CURRENT_TIMESTAMP(3))
+        "#,
+    )
+    .bind(command_id.to_string())
+    .bind(org_id.to_string())
+    .bind(store_id.to_string())
+    .bind(&device_id)
+    .bind(payload)
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+/// Record an alert when a non-canonical (non-primary) device attempts to change
+/// menu or configuration state. These rows can be surfaced in the portal for
+/// investigation or used to trigger downstream notifications.
+pub async fn insert_device_config_alert(
+    pool: &MySqlPool,
+    org_id: Uuid,
+    store_id: Uuid,
+    device_id: Uuid,
+    event_type: &str,
+    details: Option<&str>,
+) -> Result<(), sqlx::Error> {
+    sqlx::query(
+        r#"
+        INSERT INTO device_config_alerts (org_id, store_id, device_id, event_type, details)
+        VALUES (?, ?, ?, ?, ?)
+        "#,
+    )
+    .bind(org_id.to_string())
+    .bind(store_id.to_string())
+    .bind(device_id.to_string())
+    .bind(event_type)
+    .bind(details)
+    .execute(pool)
+    .await?;
+    Ok(())
+}

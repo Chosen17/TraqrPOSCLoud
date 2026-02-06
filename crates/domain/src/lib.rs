@@ -1,3 +1,4 @@
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 
@@ -69,6 +70,16 @@ pub struct LoginRequest {
     pub password: String,
 }
 
+/// Sign-up request for new cloud accounts.
+/// Creates a cloud user, organization, and initial store.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SignupRequest {
+    pub business_name: String,
+    pub store_name: String,
+    pub email: String,
+    pub password: String,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LoginResponse {
     pub ok: bool,
@@ -110,4 +121,79 @@ pub struct CreateActivationKeyResponse {
     pub scope_id: Option<Uuid>,
     pub max_uses: Option<i32>,
     pub expires_at: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeliveryProvider {
+    JustEat,
+    Deliveroo,
+    UberEats,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeliveryIntegrationStatus {
+    Disconnected,
+    Pending,
+    Connected,
+    Error,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DeliveryOrderStatus {
+    Pending,
+    Accepted,
+    Rejected,
+    Cancelled,
+    Ready,
+    Collected,
+    Delivered,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeliveryCustomer {
+    pub name: Option<String>,
+    pub phone: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeliveryAddress {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line1: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub line2: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub city: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub postcode: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub country: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeliveryItem {
+    pub name: String,
+    pub quantity: i32,
+    pub unit_price: f64,
+}
+
+/// Normalized payload we send to POS devices as `delivery_order` command.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeliveryOrderNormalized {
+    pub r#type: String, // always "delivery_order"
+    pub provider: String,
+    pub store_id: Uuid,
+    pub business_id: Uuid,
+    pub external_order_id: String,
+    pub status: DeliveryOrderStatus,
+    pub customer: Option<DeliveryCustomer>,
+    pub delivery_address: Option<DeliveryAddress>,
+    pub items: Vec<DeliveryItem>,
+    pub total: f64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub received_at: Option<DateTime<Utc>>,
 }

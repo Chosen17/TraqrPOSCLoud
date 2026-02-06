@@ -11,8 +11,8 @@
 </head>
 <body class="min-h-screen bg-ink-100">
   <div class="flex min-h-screen">
-    <!-- Sidebar -->
-    <aside class="hidden w-64 flex-col border-r border-ink-200 bg-white/90 px-4 py-6 sm:flex">
+    <!-- Sidebar: on mobile fixed and off-screen until opened -->
+    <aside id="store-sidebar" class="fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-ink-200 bg-white px-4 py-6 transition-transform duration-200 -translate-x-full sm:relative sm:translate-x-0" aria-label="Main navigation">
       <a href="/" class="mb-8 inline-flex items-center gap-2 text-ink-900">
         <img src="/traqr.png" alt="Traqr" class="h-8 w-auto" />
         <span class="text-sm font-medium text-ink-600">Cloud</span>
@@ -33,17 +33,19 @@
     </aside>
 
     <!-- Main -->
-    <main class="flex-1">
+    <main class="flex-1 min-w-0">
       <!-- Top bar (mobile) -->
       <header class="flex items-center justify-between border-b border-ink-200 bg-white px-4 py-3 sm:hidden">
-        <div class="inline-flex items-center gap-2 text-ink-900">
+        <button type="button" id="store-mobile-menu-btn" class="rounded p-2 text-ink-600 hover:bg-ink-100" aria-label="Open menu">&#9776;</button>
+        <a href="/" class="inline-flex items-center gap-2 text-ink-900">
           <img src="/traqr.png" alt="Traqr" class="h-7 w-auto" />
           <span class="text-sm font-medium text-ink-600">Cloud</span>
-        </div>
-        <div class="text-xs text-ink-500">
-          <span id="user-name-mobile">Demo Admin</span>
-        </div>
+        </a>
+        <span id="user-name-mobile" class="text-xs text-ink-500">Demo Admin</span>
       </header>
+      <div id="store-sidebar-overlay" class="fixed inset-0 z-30 hidden bg-black/50 sm:hidden" aria-hidden="true"></div>
+
+      <div id="store-toast" class="mx-4 mt-4 hidden rounded-lg border px-4 py-3 text-sm sm:mx-6 lg:mx-8" role="alert"></div>
 
       <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
         <!-- Store header -->
@@ -66,12 +68,13 @@
         </header>
 
         <!-- Tabs -->
-        <div class="mt-6 border-b border-ink-200 text-sm">
-          <nav class="-mb-px flex flex-wrap gap-4" aria-label="Store sections">
+        <div class="mt-6 border-b border-ink-200 text-sm overflow-x-auto">
+          <nav class="-mb-px flex flex-nowrap gap-2 sm:flex-wrap sm:gap-4 min-w-0" aria-label="Store sections">
             <button data-tab="devices" class="store-tab border-b-2 border-ink-900 pb-2 font-medium text-ink-900">Devices</button>
             <button data-tab="menu" class="store-tab border-b-2 border-transparent pb-2 font-medium text-ink-600 hover:text-ink-900">Menu</button>
             <button data-tab="orders" class="store-tab border-b-2 border-transparent pb-2 font-medium text-ink-600 hover:text-ink-900">Orders</button>
             <button data-tab="commands" class="store-tab border-b-2 border-transparent pb-2 font-medium text-ink-600 hover:text-ink-900">Command Center</button>
+            <button data-tab="delivery" class="store-tab border-b-2 border-transparent pb-2 font-medium text-ink-600 hover:text-ink-900">Delivery Integrations</button>
           </nav>
         </div>
 
@@ -106,6 +109,14 @@
               <h3 class="text-xs font-semibold uppercase tracking-wide text-ink-500">Activation codes</h3>
               <p class="mt-1 text-xs text-ink-600">Codes for this store. Create one, then type or paste it into the till.</p>
               <button id="issue-key-btn" class="mt-2 btn-secondary w-full text-xs">Create new activation code</button>
+              <div id="store-new-key-result" class="mt-3 hidden rounded-lg border border-emerald-200 bg-emerald-50 p-3 text-sm">
+                <p class="font-medium text-emerald-900">New activation code</p>
+                <p class="mt-1 text-xs text-emerald-800">Copy this and enter it on the till (Settings → Cloud). You won’t see it again.</p>
+                <div class="mt-2 flex flex-wrap items-center gap-2">
+                  <code id="store-new-key-value" class="rounded bg-white px-2 py-1 font-mono text-ink-900"></code>
+                  <button type="button" id="store-copy-key-btn" class="btn-secondary text-xs">Copy code</button>
+                </div>
+              </div>
               <div class="mt-3 max-h-64 space-y-2 overflow-y-auto text-xs" id="store-keys-list"></div>
               <p id="store-keys-empty" class="mt-2 text-xs text-ink-500">
                 No codes yet. Click &quot;Create new activation code&quot; above. Give the code to staff to enter on the till.
@@ -121,11 +132,24 @@
           </div>
           <div class="mt-4 grid gap-4 lg:grid-cols-[240px,minmax(0,1fr)]">
             <aside class="card">
-              <h3 class="text-xs font-semibold uppercase tracking-wide text-ink-500">Categories</h3>
+              <div class="flex items-center justify-between gap-2">
+                <h3 class="text-xs font-semibold uppercase tracking-wide text-ink-500">Categories</h3>
+                <button type="button" id="add-category-btn" class="text-xs font-medium text-traqr-600 hover:text-traqr-500">+ Add</button>
+              </div>
               <ul id="menu-categories" class="mt-3 space-y-1 text-sm"></ul>
               <p id="menu-categories-empty" class="mt-3 text-xs text-ink-500">
-                No menu categories synced yet. Once POS pushes menu events, they will appear here.
+                No categories yet. Add one here or sync from your POS.
               </p>
+              <div id="add-category-form" class="mt-3 hidden rounded-lg border border-ink-200 bg-ink-50/60 p-3">
+                <label class="block text-xs font-medium text-ink-700">Name</label>
+                <input type="text" id="new-category-name" class="mt-1 w-full rounded border border-ink-200 px-2 py-1.5 text-sm" placeholder="e.g. Mains" maxlength="255" />
+                <label class="mt-2 block text-xs font-medium text-ink-700">Position</label>
+                <input type="number" id="new-category-position" class="mt-1 w-full rounded border border-ink-200 px-2 py-1.5 text-sm" value="0" min="0" />
+                <div class="mt-2 flex gap-2">
+                  <button type="button" id="add-category-submit" class="btn-primary text-xs">Create</button>
+                  <button type="button" id="add-category-cancel" class="btn-secondary text-xs">Cancel</button>
+                </div>
+              </div>
             </aside>
             <div class="card">
               <div class="flex items-center justify-between gap-2">
@@ -133,10 +157,37 @@
                   <h3 id="menu-category-name" class="text-sm font-semibold text-ink-900">Items</h3>
                   <p id="menu-category-meta" class="mt-0.5 text-xs text-ink-500">Select a category to view items.</p>
                 </div>
+                <button type="button" id="add-item-btn" class="text-xs font-medium text-traqr-600 hover:text-traqr-500">+ Add item</button>
               </div>
               <input type="file" id="menu-item-image-input" accept="image/jpeg,image/png,image/gif,image/webp" class="hidden" />
               <div id="menu-items-list" class="mt-3 divide-y divide-ink-100"></div>
               <p id="menu-items-empty" class="mt-3 text-xs text-ink-500">No items for this category.</p>
+              <div id="add-item-form" class="mt-3 hidden rounded-lg border border-ink-200 bg-ink-50/60 p-3">
+                <label class="block text-xs font-medium text-ink-700">Name</label>
+                <input type="text" id="new-item-name" class="mt-1 w-full rounded border border-ink-200 px-2 py-1.5 text-sm" placeholder="e.g. Fish &amp; chips" maxlength="255" />
+                <label class="mt-2 block text-xs font-medium text-ink-700">Description (optional)</label>
+                <input type="text" id="new-item-description" class="mt-1 w-full rounded border border-ink-200 px-2 py-1.5 text-sm" placeholder="Optional" maxlength="500" />
+                <label class="mt-2 block text-xs font-medium text-ink-700">Price (£)</label>
+                <input type="number" id="new-item-price" class="mt-1 w-full rounded border border-ink-200 px-2 py-1.5 text-sm" placeholder="0.00" min="0" step="0.01" />
+                <label class="mt-2 block text-xs font-medium text-ink-700">Category</label>
+                <select id="new-item-category" class="mt-1 w-full rounded border border-ink-200 px-2 py-1.5 text-sm">
+                  <option value="">— None —</option>
+                </select>
+                <div class="mt-2 flex items-center gap-4">
+                  <label class="flex items-center gap-1.5 text-xs text-ink-700">
+                    <input type="checkbox" id="new-item-active" checked />
+                    Active (visible on menu)
+                  </label>
+                  <label class="flex items-center gap-1.5 text-xs text-ink-700">
+                    <input type="checkbox" id="new-item-customer-editable" />
+                    Customer editable
+                  </label>
+                </div>
+                <div class="mt-2 flex gap-2">
+                  <button type="button" id="add-item-submit" class="btn-primary text-xs">Create</button>
+                  <button type="button" id="add-item-cancel" class="btn-secondary text-xs">Cancel</button>
+                </div>
+              </div>
             </div>
           </div>
         </section>
@@ -191,6 +242,19 @@
             </p>
           </div>
         </section>
+
+        <section id="tab-delivery" class="mt-6 hidden">
+          <div class="flex items-center justify-between gap-2">
+            <h2 class="text-sm font-semibold text-ink-900">Delivery Integrations</h2>
+            <button id="refresh-delivery-btn" class="btn-secondary text-xs">Refresh</button>
+          </div>
+          <p class="mt-2 text-xs text-ink-600">
+            Connect Just Eat, Deliveroo, and Uber Eats for this store. Paste API keys or credentials, Traqr Cloud takes care of the rest.
+          </p>
+          <div id="delivery-integrations" class="mt-3 grid gap-4 md:grid-cols-3">
+            <!-- Cards populated via JS -->
+          </div>
+        </section>
       </div>
     </main>
   </div>
@@ -202,8 +266,33 @@
     }
 
     function setUserName(name) {
-      document.getElementById('user-name').textContent = name;
-      document.getElementById('user-name-mobile').textContent = name;
+      const n = name || 'Demo Admin';
+      document.getElementById('user-name').textContent = n;
+      document.getElementById('user-name-mobile').textContent = n;
+    }
+
+    function showToast(message, type) {
+      const el = document.getElementById('store-toast');
+      if (!el) return;
+      el.textContent = message;
+      el.className = 'mx-4 mt-4 rounded-lg border px-4 py-3 text-sm sm:mx-6 lg:mx-8 ' +
+        (type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800');
+      el.classList.remove('hidden');
+      el.setAttribute('role', 'alert');
+      setTimeout(function () { el.classList.add('hidden'); }, 6000);
+    }
+
+    function closeMobileNav() {
+      const sidebar = document.getElementById('store-sidebar');
+      const overlay = document.getElementById('store-sidebar-overlay');
+      if (sidebar) { sidebar.classList.remove('translate-x-0'); sidebar.classList.add('-translate-x-full'); }
+      if (overlay) overlay.classList.add('hidden');
+    }
+    function openMobileNav() {
+      const sidebar = document.getElementById('store-sidebar');
+      const overlay = document.getElementById('store-sidebar-overlay');
+      if (sidebar) { sidebar.classList.remove('-translate-x-full'); sidebar.classList.add('translate-x-0'); }
+      if (overlay) overlay.classList.remove('hidden');
     }
 
     function formatDateTime(value) {
@@ -237,7 +326,7 @@
         const active = btn.dataset.tab === tabId;
         btn.className = 'store-tab border-b-2 pb-2 font-medium ' + (active ? 'border-ink-900 text-ink-900' : 'border-transparent text-ink-600 hover:text-ink-900');
       });
-      ['devices', 'menu', 'orders', 'commands'].forEach((id) => {
+      ['devices', 'menu', 'orders', 'commands', 'delivery'].forEach((id) => {
         const panel = document.getElementById('tab-' + id);
         if (!panel) return;
         panel.classList.toggle('hidden', id !== tabId);
@@ -346,6 +435,7 @@
       if (!res.ok) throw new Error('Failed to load menu');
       const data = await res.json();
       const categories = data.categories || [];
+      window.menuCategories = categories;
       const items = data.items || [];
 
       const catList = document.getElementById('menu-categories');
@@ -366,7 +456,7 @@
           btn.addEventListener('click', () => {
             loadMenu(storeId, c.id).catch(err => {
               console.error(err);
-              alert('Failed to load category.');
+              showToast('Failed to load category.', 'error');
             });
           });
           catList.appendChild(li);
@@ -499,10 +589,185 @@
       }
     }
 
+    function renderDeliveryCard(container, provider, data, storeId) {
+      const status = data?.status || 'disconnected';
+      const lastSync = data?.last_sync_at || null;
+      const statusLabel =
+        status === 'connected'
+          ? 'Connected'
+          : status === 'pending'
+          ? 'Pending'
+          : status === 'error'
+          ? 'Error'
+          : 'Disconnected';
+      const statusClass =
+        status === 'connected'
+          ? 'bg-emerald-50 text-emerald-700'
+          : status === 'error'
+          ? 'bg-rose-50 text-rose-700'
+          : status === 'pending'
+          ? 'bg-amber-50 text-amber-800'
+          : 'bg-ink-50 text-ink-600';
+      const title =
+        provider === 'just_eat'
+          ? 'Just Eat'
+          : provider === 'deliveroo'
+          ? 'Deliveroo'
+          : 'Uber Eats';
+      const isComingSoon = provider === 'just_eat';
+      const connectLabel = isComingSoon
+        ? 'Coming soon'
+        : status === 'connected'
+        ? 'Disconnect'
+        : 'Connect';
+      const connectAction = isComingSoon
+        ? 'coming-soon'
+        : status === 'connected'
+        ? 'disconnect'
+        : 'connect';
+
+      const card = document.createElement('div');
+      card.className = 'rounded-xl border border-ink-100 bg-white p-3 shadow-sm flex flex-col justify-between';
+      card.innerHTML = `
+        <div>
+          <div class="flex items-center justify-between gap-2">
+            <div>
+              <div class="text-sm font-semibold text-ink-900">${title}</div>
+              <div class="mt-0.5 text-xs text-ink-500">Per-store integration • ${storeId.slice(0, 8)}</div>
+            </div>
+            <span class="inline-flex rounded-full px-2 py-0.5 text-[11px] font-medium ${statusClass}">${statusLabel}</span>
+          </div>
+          <div class="mt-2 text-[11px] text-ink-500">
+            Last sync: ${lastSync ? formatFriendlyDateTime(lastSync) : '—'}
+          </div>
+          ${data?.last_error_message ? `<div class="mt-1 text-[11px] text-rose-600">Error: ${data.last_error_message}</div>` : ''}
+        </div>
+        <div class="mt-3 flex flex-wrap items-center gap-2 text-[11px]">
+          <button type="button" class="btn-secondary px-3 py-1 text-[11px]" data-provider="${provider}" data-action="${connectAction}" ${isComingSoon ? 'disabled' : ''}>
+            ${connectLabel}
+          </button>
+          <button type="button" class="px-2 py-1 text-traqr-600 hover:text-traqr-500" data-provider="${provider}" data-action="test" ${isComingSoon ? 'disabled' : ''}>
+            Test connection
+          </button>
+          <button type="button" class="px-2 py-1 text-ink-500 hover:text-ink-800" data-provider="${provider}" data-action="logs">
+            View logs
+          </button>
+        </div>
+      `;
+      container.appendChild(card);
+    }
+
+    async function loadDeliveryIntegrations(storeId) {
+      const res = await fetch(`/api/portal/stores/${encodeURIComponent(storeId)}/delivery_integrations`);
+      if (!res.ok) throw new Error('Failed to load delivery integrations');
+      const data = await res.json();
+      const container = document.getElementById('delivery-integrations');
+      container.innerHTML = '';
+      const map = data.integrations || {};
+      const providers = ['just_eat', 'deliveroo', 'uber_eats'];
+      for (const p of providers) {
+        renderDeliveryCard(container, p, map[p] || null, storeId);
+      }
+
+      container.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button[data-provider][data-action]');
+        if (!btn) return;
+        const provider = btn.getAttribute('data-provider');
+        const action = btn.getAttribute('data-action');
+        if (action === 'coming-soon') {
+          showToast('Just Eat integration is coming soon. Deliveroo and Uber Eats are available to connect today.', 'error');
+          return;
+        }
+        if (action === 'logs') {
+          window.location.href = `/ops-commands?view=delivery&store_id=${encodeURIComponent(storeId)}&provider=${encodeURIComponent(provider)}`;
+          return;
+        }
+        if (action === 'test') {
+          try {
+            const r = await fetch(`/api/portal/stores/${encodeURIComponent(storeId)}/delivery_integrations/${encodeURIComponent(provider)}/test`, { method: 'POST' });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(body.message || 'Test failed');
+            alert(body.message || 'Connection OK');
+          } catch (err) {
+            console.error(err);
+            showToast('Test failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+          }
+          return;
+        }
+        if (action === 'connect') {
+          let payload = null;
+          if (provider === 'uber_eats') {
+            const clientId = prompt('Enter Uber Eats Client ID (from Uber Developer Dashboard) for this store.');
+            if (!clientId) return;
+            const clientSecret = prompt('Enter Uber Eats Client Secret (will be stored encrypted).');
+            if (!clientSecret) return;
+            const storeRef = prompt('Enter the Uber Eats store/location id (meta.user_id in webhooks).');
+            if (!storeRef) return;
+            payload = {
+              api_key: clientId, // stored but not used for Uber; client_id/client_secret drive OAuth
+              provider_store_reference: storeRef,
+              client_id: clientId,
+              client_secret: clientSecret,
+            };
+          } else if (provider === 'deliveroo') {
+            const webhookSecret = prompt('Enter Deliveroo webhook secret (from Deliveroo Developer Portal) for this store.');
+            if (!webhookSecret) return;
+            const storeRef = prompt('Enter the Deliveroo location_id for this store (used in webhooks).');
+            if (!storeRef) return;
+            payload = {
+              api_key: webhookSecret, // used as HMAC secret for Deliveroo webhooks
+              provider_store_reference: storeRef,
+            };
+          } else {
+            const apiKey = prompt('Enter Just Eat JE-API-KEY (from Just Eat partner portal) for this store.');
+            if (!apiKey) return;
+            const storeRef = prompt('Enter the Just Eat restaurant/store identifier (e.g. restaurant_id).');
+            if (!storeRef) return;
+            payload = {
+              api_key: apiKey,
+              provider_store_reference: storeRef,
+            };
+          }
+          try {
+            const r = await fetch(`/api/portal/stores/${encodeURIComponent(storeId)}/delivery_integrations/${encodeURIComponent(provider)}/connect`, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(body.message || 'Connect failed');
+            showToast(body.message || 'Connected successfully', 'success');
+            await loadDeliveryIntegrations(storeId);
+          } catch (err) {
+            console.error(err);
+            showToast('Connect failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+          }
+          return;
+        }
+        if (action === 'disconnect') {
+          if (!confirm('Disconnect this provider for this store? Orders will stop syncing.')) return;
+          try {
+            const r = await fetch(`/api/portal/stores/${encodeURIComponent(storeId)}/delivery_integrations/${encodeURIComponent(provider)}/disconnect`, {
+              method: 'POST'
+            });
+            const body = await r.json().catch(() => ({}));
+            if (!r.ok) throw new Error(body.message || 'Disconnect failed');
+            showToast(body.message || 'Disconnected.', 'success');
+            await loadDeliveryIntegrations(storeId);
+          } catch (err) {
+            console.error(err);
+            showToast('Disconnect failed: ' + (err && err.message ? err.message : 'Unknown error'), 'error');
+          }
+        }
+      }, { once: true });
+    }
+
     async function init() {
       const storeId = getQueryParam('store_id');
       if (!storeId) {
-        alert('Missing store_id in URL');
+        document.getElementById('store-toast').textContent = 'Missing store_id in URL. Open a store from Organizations.';
+        document.getElementById('store-toast').className = 'mx-4 mt-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800 sm:mx-6 lg:mx-8';
+        document.getElementById('store-toast').classList.remove('hidden');
         return;
       }
       try {
@@ -517,17 +782,22 @@
           if (tab === 'menu') {
             loadMenu(storeId).catch(err => {
               console.error(err);
-              alert('Failed to load menu.');
+              showToast('Failed to load menu.', 'error');
             });
           } else if (tab === 'orders') {
             loadOrders(storeId).catch(err => {
               console.error(err);
-              alert('Failed to load orders.');
+              showToast('Failed to load orders.', 'error');
             });
           } else if (tab === 'commands') {
             loadCommands(storeId).catch(err => {
               console.error(err);
-              alert('Failed to load commands.');
+              showToast('Failed to load commands.', 'error');
+            });
+          } else if (tab === 'delivery') {
+            loadDeliveryIntegrations(storeId).catch(err => {
+              console.error(err);
+              showToast('Failed to load delivery integrations.', 'error');
             });
           }
         });
@@ -535,21 +805,23 @@
       document.getElementById('refresh-devices-btn').addEventListener('click', () => {
         loadDevices(storeId).catch(err => {
           console.error(err);
-          alert('Failed to refresh devices. Check API logs.');
+          showToast('Failed to refresh devices.', 'error');
         });
         loadActivationKeys(storeId).catch(err => {
           console.error(err);
-          alert('Failed to refresh activation keys.');
+          showToast('Failed to refresh activation keys.', 'error');
         });
       });
       document.getElementById('issue-key-btn').addEventListener('click', async () => {
         if (!window.currentStoreMeta) {
-          alert('Store metadata not loaded yet.');
+          showToast('Store metadata not loaded yet. Wait a moment and try again.', 'error');
           return;
         }
         if (!confirm('Create a new activation code for this store? You’ll see it once — copy it and enter it on the till.')) {
           return;
         }
+        const resultEl = document.getElementById('store-new-key-result');
+        const keyEl = document.getElementById('store-new-key-value');
         try {
           const res = await fetch('/api/admin/activation-keys', {
             method: 'POST',
@@ -568,18 +840,107 @@
           }
           const data = await res.json();
           const key = data.activation_key;
-          alert('Activation code (copy this into the till → Settings → Cloud):\n\n' + key + '\n\nTip: copy the text above so staff can paste it on the till.');
+          if (keyEl) keyEl.textContent = key;
+          if (resultEl) { resultEl.classList.remove('hidden'); }
           await loadActivationKeys(storeId);
         } catch (err) {
           console.error(err);
-          alert('Could not create activation code. Try again or check with your admin.');
+          showToast('Could not create activation code. Try again or check with your admin.', 'error');
         }
       });
       document.getElementById('refresh-menu-btn').addEventListener('click', () => {
         loadMenu(storeId).catch(err => {
           console.error(err);
-          alert('Failed to refresh menu.');
+          showToast('Failed to refresh menu.', 'error');
         });
+      });
+      const addCategoryForm = document.getElementById('add-category-form');
+      const addItemForm = document.getElementById('add-item-form');
+      document.getElementById('add-category-btn').addEventListener('click', () => {
+        addCategoryForm.classList.remove('hidden');
+        document.getElementById('new-category-name').value = '';
+        document.getElementById('new-category-position').value = '0';
+        document.getElementById('new-category-name').focus();
+      });
+      document.getElementById('add-category-cancel').addEventListener('click', () => {
+        addCategoryForm.classList.add('hidden');
+      });
+      document.getElementById('add-category-submit').addEventListener('click', async () => {
+        const name = document.getElementById('new-category-name').value.trim();
+        if (!name) {
+          showToast('Enter a category name.', 'error');
+          return;
+        }
+        const position = parseInt(document.getElementById('new-category-position').value, 10) || 0;
+        try {
+          const r = await fetch('/api/portal/stores/' + encodeURIComponent(storeId) + '/menu/categories', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ name, position })
+          });
+          if (!r.ok) {
+            const t = await r.text();
+            throw new Error(t || 'Failed to create category');
+          }
+          addCategoryForm.classList.add('hidden');
+          await loadMenu(storeId);
+        } catch (err) {
+          console.error(err);
+          showToast(err && err.message ? err.message : 'Failed to create category.', 'error');
+        }
+      });
+      document.getElementById('add-item-btn').addEventListener('click', () => {
+        const sel = document.getElementById('new-item-category');
+        sel.innerHTML = '<option value="">— None —</option>';
+        (window.menuCategories || []).forEach((c) => {
+          const opt = document.createElement('option');
+          opt.value = c.id;
+          opt.textContent = c.name;
+          sel.appendChild(opt);
+        });
+        addItemForm.classList.remove('hidden');
+        document.getElementById('new-item-name').value = '';
+        document.getElementById('new-item-description').value = '';
+        document.getElementById('new-item-price').value = '';
+        document.getElementById('new-item-active').checked = true;
+        document.getElementById('new-item-customer-editable').checked = false;
+        document.getElementById('new-item-name').focus();
+      });
+      document.getElementById('add-item-cancel').addEventListener('click', () => {
+        addItemForm.classList.add('hidden');
+      });
+      document.getElementById('add-item-submit').addEventListener('click', async () => {
+        const name = document.getElementById('new-item-name').value.trim();
+        if (!name) {
+          showToast('Enter an item name.', 'error');
+          return;
+        }
+        const description = document.getElementById('new-item-description').value.trim() || null;
+        const priceStr = document.getElementById('new-item-price').value.trim();
+        const pricePence = priceStr === '' ? null : Math.round(parseFloat(priceStr) * 100);
+        const categoryId = document.getElementById('new-item-category').value.trim() || null;
+        const active = document.getElementById('new-item-active').checked;
+        const customerEditable = document.getElementById('new-item-customer-editable').checked;
+        const body = { name, description, price_pence: pricePence, active, customer_editable: customerEditable };
+        if (categoryId) body.category_id = categoryId;
+        try {
+          const r = await fetch('/api/portal/stores/' + encodeURIComponent(storeId) + '/menu/items', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify(body)
+          });
+          if (!r.ok) {
+            const data = await r.json().catch(() => ({}));
+            throw new Error(data.message || (await r.text()) || 'Failed to create item');
+          }
+          addItemForm.classList.add('hidden');
+          await loadMenu(storeId);
+        } catch (err) {
+          console.error(err);
+          showToast(err && err.message ? err.message : 'Failed to create item.', 'error');
+        }
       });
       document.getElementById('menu-items-list').addEventListener('click', function (e) {
         const btn = e.target.closest('.menu-item-add-image');
@@ -602,7 +963,7 @@
           await loadMenu(menuItemImagePending.storeId);
         } catch (err) {
           console.error(err);
-          alert('Failed to upload image.');
+          showToast('Failed to upload image.', 'error');
         }
         menuItemImagePending = null;
         this.value = '';
@@ -610,14 +971,32 @@
       document.getElementById('refresh-orders-btn').addEventListener('click', () => {
         loadOrders(storeId).catch(err => {
           console.error(err);
-          alert('Failed to refresh orders.');
+          showToast('Failed to refresh orders.', 'error');
         });
       });
       document.getElementById('refresh-commands-btn').addEventListener('click', () => {
         loadCommands(storeId).catch(err => {
           console.error(err);
-          alert('Failed to refresh commands.');
+          showToast('Failed to refresh commands.', 'error');
         });
+      });
+      document.getElementById('refresh-delivery-btn').addEventListener('click', () => {
+        loadDeliveryIntegrations(storeId).catch(err => {
+          console.error(err);
+          showToast('Failed to refresh delivery integrations.', 'error');
+        });
+      });
+
+      document.getElementById('store-mobile-menu-btn').addEventListener('click', openMobileNav);
+      document.getElementById('store-sidebar-overlay').addEventListener('click', closeMobileNav);
+      document.getElementById('store-sidebar').querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', closeMobileNav);
+      });
+      document.getElementById('store-copy-key-btn').addEventListener('click', function () {
+        const keyEl = document.getElementById('store-new-key-value');
+        const key = keyEl && keyEl.textContent ? keyEl.textContent.trim() : '';
+        if (!key) return;
+        navigator.clipboard.writeText(key).then(() => showToast('Activation code copied to clipboard.', 'success')).catch(() => showToast('Copy failed. Select and copy the code by hand.', 'error'));
       });
 
       await loadStoreHeader(storeId);
@@ -625,11 +1004,12 @@
       await loadActivationKeys(storeId);
 
       const hash = (window.location.hash || '').replace('#', '');
-      if (['devices', 'menu', 'orders', 'commands'].includes(hash)) {
+      if (['devices', 'menu', 'orders', 'commands', 'delivery'].includes(hash)) {
         switchTab(hash);
         if (hash === 'menu') loadMenu(storeId).catch(() => {});
         else if (hash === 'orders') loadOrders(storeId).catch(() => {});
         else if (hash === 'commands') loadCommands(storeId).catch(() => {});
+        else if (hash === 'delivery') loadDeliveryIntegrations(storeId).catch(() => {});
       }
     }
 
@@ -637,4 +1017,3 @@
   </script>
 </body>
 </html>
-

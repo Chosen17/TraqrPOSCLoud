@@ -2,6 +2,7 @@ use axum::{extract::State, http::StatusCode, routing::get, Json, Router};
 use serde::Serialize;
 use sqlx::Row;
 
+use crate::session::CurrentUser;
 use crate::state::AppState;
 
 #[derive(Debug, Serialize)]
@@ -36,6 +37,7 @@ pub fn router(_state: AppState) -> Router<AppState> {
 
 async fn get_summary(
     State(state): State<AppState>,
+    _user: CurrentUser,
 ) -> Result<Json<DashboardSummary>, (StatusCode, String)> {
     let db = state.db.as_ref().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
@@ -92,6 +94,7 @@ async fn get_summary(
 
 async fn get_recent_orders(
     State(state): State<AppState>,
+    _user: CurrentUser,
 ) -> Result<Json<RecentOrdersResponse>, (StatusCode, String)> {
     let db = state.db.as_ref().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,

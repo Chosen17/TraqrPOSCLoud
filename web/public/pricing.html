@@ -19,7 +19,8 @@
         <a href="/pricing" class="text-sm font-medium text-ink-900">Pricing</a>
         <a href="/devices" class="text-sm font-medium text-ink-600 hover:text-ink-900">Devices</a>
         <a href="/contact" class="text-sm font-medium text-ink-600 hover:text-ink-900">Contact</a>
-        <a href="/login" class="btn-primary text-sm">Log in</a>
+        <a href="/login" class="btn-secondary text-sm">Log in</a>
+        <a href="/signup" class="btn-primary text-sm">Start cloud membership</a>
       </div>
     </nav>
   </header>
@@ -48,19 +49,24 @@
 
         <div class="card border-traqr-300 ring-2 ring-traqr-500/20">
           <div class="flex items-center gap-2">
-            <span class="rounded-full bg-traqr-100 px-2.5 py-0.5 text-xs font-medium text-traqr-700">Add-on</span>
+            <span class="rounded-full bg-traqr-100 px-2.5 py-0.5 text-xs font-medium text-traqr-700">Cloud</span>
           </div>
-          <h2 class="mt-2 font-display text-xl font-semibold text-ink-900">Cloud sync</h2>
-          <p class="mt-2 text-sm text-ink-600">Optional. Sync events to cloud, receive commands, reporting & approvals.</p>
-          <p class="mt-6 font-display text-3xl font-bold text-ink-900">Per device / month</p>
-          <p class="text-sm text-ink-500">Contact for volume and org pricing.</p>
+          <h2 class="mt-2 font-display text-xl font-semibold text-ink-900">Traqr Cloud membership</h2>
+          <p class="mt-2 text-sm text-ink-600">Sync your tills to the cloud, see orders and devices in one place, and connect delivery partners.</p>
+          <p class="mt-6 font-display text-3xl font-bold text-ink-900">£30<span class="text-base font-medium text-ink-500">/month</span></p>
+          <p class="text-sm text-ink-500">Per business (organisation). Cancel anytime.</p>
           <ul class="mt-6 space-y-3 text-sm text-ink-700">
-            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Events up (orders, transactions)</li>
-            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Commands down (refund, void, menu publish)</li>
-            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Two-person approval for sensitive actions</li>
-            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Org / franchise / store management</li>
+            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Cloud dashboard for orders, menus, devices</li>
+            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Delivery integrations (Deliveroo &amp; Uber Eats; Just Eat coming soon)</li>
+            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Commands down (refund, void, menu publish) with approvals</li>
+            <li class="flex items-center gap-2"><span class="text-traqr-500">✓</span> Multi-location management (org / franchise / store)</li>
           </ul>
-          <a href="/contact" class="mt-8 inline-block btn-primary w-full sm:w-auto text-center">Contact sales</a>
+          <button id="start-membership-btn" class="mt-8 inline-flex w-full items-center justify-center btn-primary text-sm">
+            Start cloud membership
+          </button>
+          <p class="mt-3 text-xs text-ink-500">
+            You’ll be redirected to our secure Stripe checkout. No long-term contracts.
+          </p>
         </div>
       </div>
     </section>
@@ -79,5 +85,46 @@
       <p class="mt-8 text-center text-sm text-ink-500 sm:text-left">cloud.traqr.co.uk</p>
     </div>
   </footer>
+  <script>
+    function ensureLoggedInAndStartMembership() {
+      try {
+        const userId = window.localStorage.getItem('traqr_user_id');
+        if (!userId) {
+          // Send new users to signup; existing users can log in from there.
+          window.location.href = '/signup?next=' + encodeURIComponent('/pricing?from=signup');
+          return;
+        }
+      } catch (_) {}
+      startStripeCheckout().catch(err => {
+        console.error(err);
+        alert('Could not start checkout. Please try again or contact support.');
+      });
+    }
+
+    async function startStripeCheckout() {
+      const res = await fetch('/api/billing/create-checkout-session', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        throw new Error(body.message || 'Failed to create checkout session');
+      }
+      const body = await res.json();
+      if (body.checkout_url) {
+        window.location.href = body.checkout_url;
+      } else {
+        throw new Error('Missing checkout URL from server');
+      }
+    }
+
+    (function init() {
+      const btn = document.getElementById('start-membership-btn');
+      if (btn) {
+        btn.addEventListener('click', ensureLoggedInAndStartMembership);
+      }
+    })();
+  </script>
 </body>
 </html>

@@ -12,7 +12,7 @@
 <body class="min-h-screen bg-ink-100">
   <div class="flex min-h-screen">
     <!-- Sidebar -->
-    <aside class="hidden w-64 flex-col border-r border-ink-200 bg-white/90 px-4 py-6 sm:flex">
+    <aside id="orgs-sidebar" class="fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-ink-200 bg-white px-4 py-6 transition-transform duration-200 -translate-x-full sm:relative sm:translate-x-0" aria-label="Main navigation">
       <a href="/" class="mb-8 inline-flex items-center gap-2 text-ink-900">
         <img src="/traqr.png" alt="Traqr" class="h-8 w-auto" />
         <span class="text-sm font-medium text-ink-600">Cloud</span>
@@ -35,17 +35,17 @@
     </aside>
 
     <!-- Main content -->
-    <main class="flex-1">
-      <!-- Top bar (mobile) -->
+    <main class="flex-1 min-w-0">
       <header class="flex items-center justify-between border-b border-ink-200 bg-white px-4 py-3 sm:hidden">
-        <div class="inline-flex items-center gap-2 text-ink-900">
+        <button type="button" id="orgs-mobile-menu-btn" class="rounded p-2 text-ink-600 hover:bg-ink-100" aria-label="Open menu">&#9776;</button>
+        <a href="/" class="inline-flex items-center gap-2 text-ink-900">
           <img src="/traqr.png" alt="Traqr" class="h-7 w-auto" />
           <span class="text-sm font-medium text-ink-600">Cloud</span>
-        </div>
-        <div class="text-xs text-ink-500">
-          <span id="user-name-mobile">Demo Admin</span>
-        </div>
+        </a>
+        <span id="user-name-mobile" class="text-xs text-ink-500">Demo Admin</span>
       </header>
+      <div id="orgs-sidebar-overlay" class="fixed inset-0 z-30 hidden bg-black/50 sm:hidden" aria-hidden="true"></div>
+      <div id="orgs-toast" class="mx-4 mt-4 hidden rounded-lg border px-4 py-3 text-sm sm:mx-6 lg:mx-8" role="alert"></div>
 
       <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
         <!-- Summary strip -->
@@ -295,20 +295,44 @@
       }
     }
 
+    function showToast(msg, type) {
+      const el = document.getElementById('orgs-toast');
+      if (!el) return;
+      el.textContent = msg;
+      el.className = 'mx-4 mt-4 rounded-lg border px-4 py-3 text-sm sm:mx-6 lg:mx-8 ' +
+        (type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800');
+      el.classList.remove('hidden');
+      setTimeout(function () { el.classList.add('hidden'); }, 6000);
+    }
+    function closeOrgsNav() {
+      document.getElementById('orgs-sidebar').classList.remove('translate-x-0');
+      document.getElementById('orgs-sidebar').classList.add('-translate-x-full');
+      document.getElementById('orgs-sidebar-overlay').classList.add('hidden');
+    }
+    function openOrgsNav() {
+      document.getElementById('orgs-sidebar').classList.remove('-translate-x-full');
+      document.getElementById('orgs-sidebar').classList.add('translate-x-0');
+      document.getElementById('orgs-sidebar-overlay').classList.remove('hidden');
+    }
     async function init() {
       try {
         const storedName = window.localStorage.getItem('traqr_display_name');
         if (storedName) setUserName(storedName);
       } catch (_) {}
+      document.getElementById('orgs-mobile-menu-btn').addEventListener('click', openOrgsNav);
+      document.getElementById('orgs-sidebar-overlay').addEventListener('click', closeOrgsNav);
+      document.getElementById('orgs-sidebar').querySelectorAll('a').forEach(function (a) {
+        a.addEventListener('click', closeOrgsNav);
+      });
       document.getElementById('refresh-orgs-btn').addEventListener('click', () => {
         loadOrgs().catch(err => {
           console.error(err);
-          alert('Failed to refresh organizations. Check API logs.');
+          showToast('Failed to refresh organizations.', 'error');
         });
       });
       document.getElementById('grant-cloud-sync-btn').addEventListener('click', async () => {
         if (!window.currentOrgId) {
-          alert('Select an organization first.');
+          showToast('Select an organization first.', 'error');
           return;
         }
         if (!confirm('Grant or extend Cloud Sync entitlement for this organization?')) {
@@ -324,10 +348,11 @@
             const text = await res.text();
             throw new Error(text || 'Failed to grant Cloud Sync');
           }
+          showToast('Cloud Sync granted.', 'success');
           await selectOrg(window.currentOrgId);
         } catch (err) {
           console.error(err);
-          alert('Failed to grant Cloud Sync. Check API logs.');
+          showToast('Failed to grant Cloud Sync.', 'error');
         }
       });
 

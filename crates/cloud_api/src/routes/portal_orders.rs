@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use uuid::Uuid;
 
+use crate::session::CurrentUser;
 use crate::state::AppState;
 
 #[derive(Debug, Deserialize)]
@@ -75,6 +76,7 @@ pub fn router(_state: AppState) -> Router<AppState> {
 
 async fn get_order_detail(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(OrderPathParams { order_id }): Path<OrderPathParams>,
 ) -> Result<Json<OrderDetailResponse>, (StatusCode, String)> {
     let db = state.db.as_ref().ok_or((
@@ -100,9 +102,25 @@ async fn get_order_detail(
         return Err((StatusCode::NOT_FOUND, "order not found".to_string()));
     };
 
+    // Tenant/security: ensure the current user can access the store for this order.
+    let store_id: String = order_row.get("store_id");
+    let store_uuid =
+        Uuid::parse_str(&store_id).map_err(|_| (StatusCode::INTERNAL_SERVER_ERROR, "invalid store_id".to_string()))?;
+    let allowed = db::user_can_access_store(db, &user.0, store_uuid)
+        .await
+        .map_err(internal)?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
+
     let item_rows = sqlx::query(
         r#"
-        SELECT local_item_id, product_ref, quantity, unit_price_cents, line_total_cents
+        SELECT
+          local_item_id,
+          product_ref,
+          CAST(quantity AS DOUBLE) AS quantity,
+          unit_price_cents,
+          line_total_cents
         FROM order_items
         WHERE order_id = ?
         ORDER BY created_at
@@ -150,7 +168,6 @@ async fn get_order_detail(
         })
         .collect();
 
-    let store_id: String = order_row.get("store_id");
     let device_id: String = order_row.get("device_id");
     let local_order_id: String = order_row.get("local_order_id");
     let rc_rows = sqlx::query(
@@ -201,6 +218,7 @@ async fn get_order_detail(
 
 async fn enqueue_order_command(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(OrderPathParams { order_id }): Path<OrderPathParams>,
     Json(body): Json<EnqueueCommandRequest>,
 ) -> Result<Json<EnqueueCommandResponse>, (StatusCode, String)> {
@@ -241,6 +259,13 @@ async fn enqueue_order_command(
     let org_id = Uuid::parse_str(&org_id_s).map_err(|_| internal("invalid org_id"))?;
     let store_id = Uuid::parse_str(&store_id_s).map_err(|_| internal("invalid store_id"))?;
     let device_id = Uuid::parse_str(&device_id_s).map_err(|_| internal("invalid device_id"))?;
+
+    let allowed = db::user_can_access_store(db, &user.0, store_id)
+        .await
+        .map_err(internal)?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
 
     let command_id = Uuid::new_v4();
     let command_body = serde_json::json!({ "local_order_id": local_order_id });

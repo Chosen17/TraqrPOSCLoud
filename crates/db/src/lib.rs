@@ -1,6 +1,7 @@
 mod auth;
 mod blog;
 mod device;
+mod delivery_integrations;
 mod docs;
 mod orders;
 mod profile;
@@ -19,6 +20,7 @@ pub type DbPool = Pool<MySql>;
 pub use auth::*;
 pub use blog::*;
 pub use device::*;
+pub use delivery_integrations::*;
 pub use docs::*;
 pub use orders::*;
 pub use profile::*;
@@ -27,7 +29,7 @@ pub use sync::*;
 pub use tenancy::*;
 pub use entitlements::*;
 pub use super_admin::*;
-pub use utils::slug_from_title;
+pub use utils::{slug_from_title, user_can_access_org, user_can_access_store};
 
 pub async fn connect(database_url: &str) -> Result<DbPool, sqlx::Error> {
     Pool::<MySql>::connect(database_url).await

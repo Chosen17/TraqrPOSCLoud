@@ -103,6 +103,59 @@ pub async fn create_device(
     .bind(is_primary)
     .execute(pool)
     .await?;
+    // If this device is marked as primary, clear primary flag on other devices
+    // in the same store and record it as the store's canonical device.
+    if is_primary {
+        sqlx::query(
+            r#"
+            UPDATE devices
+            SET is_primary = 0
+            WHERE store_id = ? AND id <> ?
+            "#,
+        )
+        .bind(store_id.to_string())
+        .bind(id.to_string())
+        .execute(pool)
+        .await?;
+
+        sqlx::query(
+            r#"
+            UPDATE stores
+            SET canonical_device_id = ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(id.to_string())
+        .bind(store_id.to_string())
+        .execute(pool)
+        .await?;
+    }
+
+    // If the store does not yet have a canonical device, default to this one
+    // so the portal always has a clear canonical device field.
+    let row: Option<(Option<String>,)> = sqlx::query_as(
+        r#"
+        SELECT canonical_device_id
+        FROM stores
+        WHERE id = ?
+        "#,
+    )
+    .bind(store_id.to_string())
+    .fetch_optional(pool)
+    .await?;
+    if let Some((None,)) = row {
+        sqlx::query(
+            r#"
+            UPDATE stores
+            SET canonical_device_id = ?
+            WHERE id = ?
+            "#,
+        )
+        .bind(id.to_string())
+        .bind(store_id.to_string())
+        .execute(pool)
+        .await?;
+    }
     Ok(id)
 }
 
@@ -113,16 +166,87 @@ pub async fn update_device_name_primary(
     device_name: Option<&str>,
     is_primary: bool,
 ) -> Result<(), sqlx::Error> {
-    sqlx::query(
+    // Look up the store for this device so we can maintain a single primary
+    // and keep the store's canonical_device_id in sync with the primary.
+    let row: Option<(String,)> = sqlx::query_as(
         r#"
-        UPDATE devices SET device_name = ?, is_primary = ? WHERE id = ?
+        SELECT store_id
+        FROM devices
+        WHERE id = ?
         "#,
     )
-    .bind(device_name)
-    .bind(is_primary)
     .bind(device_id.to_string())
-    .execute(pool)
+    .fetch_optional(pool)
     .await?;
+
+    if let Some((store_id,)) = row {
+        if is_primary {
+            // Clear primary on other devices in the same store, then set this
+            // device as primary and mark it canonical for the store.
+            sqlx::query(
+                r#"
+                UPDATE devices
+                SET is_primary = 0
+                WHERE store_id = ? AND id <> ?
+                "#,
+            )
+            .bind(&store_id)
+            .bind(device_id.to_string())
+            .execute(pool)
+            .await?;
+
+            sqlx::query(
+                r#"
+                UPDATE devices
+                SET device_name = ?, is_primary = 1
+                WHERE id = ?
+                "#,
+            )
+            .bind(device_name)
+            .bind(device_id.to_string())
+            .execute(pool)
+            .await?;
+
+            sqlx::query(
+                r#"
+                UPDATE stores
+                SET canonical_device_id = ?
+                WHERE id = ?
+                "#,
+            )
+            .bind(device_id.to_string())
+            .bind(&store_id)
+            .execute(pool)
+            .await?;
+        } else {
+            // Only update the name; do not change canonical assignment when a
+            // device is demoted from primary. Canonical will move when another
+            // device is marked primary.
+            sqlx::query(
+                r#"
+                UPDATE devices
+                SET device_name = ?, is_primary = 0
+                WHERE id = ?
+                "#,
+            )
+            .bind(device_name)
+            .bind(device_id.to_string())
+            .execute(pool)
+            .await?;
+        }
+    } else {
+        // Fallback: if we cannot resolve the store, just update the device row.
+        sqlx::query(
+            r#"
+            UPDATE devices SET device_name = ?, is_primary = ? WHERE id = ?
+            "#,
+        )
+        .bind(device_name)
+        .bind(is_primary)
+        .bind(device_id.to_string())
+        .execute(pool)
+        .await?;
+    }
     Ok(())
 }
 
@@ -188,6 +312,37 @@ pub async fn create_device_token(
     .execute(pool)
     .await?;
     Ok(id)
+}
+
+/// Canonical device for a store (if explicitly set on the stores table).
+pub async fn get_canonical_device_for_store(
+    pool: &MySqlPool,
+    store_id: Uuid,
+) -> Result<Option<Uuid>, sqlx::Error> {
+    let row: Option<(Option<String>,)> = sqlx::query_as(
+        r#"
+        SELECT canonical_device_id
+        FROM stores
+        WHERE id = ?
+        "#,
+    )
+    .bind(store_id.to_string())
+    .fetch_optional(pool)
+    .await?;
+
+    Ok(row.and_then(|(maybe_id,)| maybe_id.and_then(|s| Uuid::parse_str(&s).ok())))
+}
+
+/// Convenience helper: returns true if the given device is currently the
+/// canonical device for the store. If no canonical is set, returns false so
+/// callers can decide how strict they want to be.
+pub async fn is_device_canonical_for_store(
+    pool: &MySqlPool,
+    store_id: Uuid,
+    device_id: Uuid,
+) -> Result<bool, sqlx::Error> {
+    let canonical = get_canonical_device_for_store(pool, store_id).await?;
+    Ok(matches!(canonical, Some(id) if id == device_id))
 }
 
 /// Device identity from valid token (for sync endpoints).

@@ -8,9 +8,11 @@ use serde::{Deserialize, Serialize};
 use sqlx::Row;
 use uuid::Uuid;
 
+use crate::session::CurrentUser;
 use crate::state::AppState;
 use db::{
-    enqueue_apply_menu_for_store, update_pos_menu_category_by_id,
+    create_pos_menu_category, create_pos_menu_item, enqueue_apply_menu_for_store,
+    ensure_pos_menu, get_device_id_for_store, update_pos_menu_category_by_id,
     update_pos_menu_category_image_by_id, update_pos_menu_item_by_id,
     update_pos_menu_item_image_by_id,
 };
@@ -87,6 +89,8 @@ pub struct StoreMetaResponse {
     pub id: String,
     pub org_id: String,
     pub name: String,
+    pub canonical_device_id: Option<String>,
+    pub canonical_device_name: Option<String>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -103,11 +107,43 @@ pub struct PatchMenuCategoryBody {
     pub position: Option<i32>,
 }
 
+#[derive(Debug, Deserialize)]
+pub struct CreateMenuCategoryBody {
+    pub name: String,
+    #[serde(default)]
+    pub position: i32,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct CreateMenuItemBody {
+    pub name: String,
+    pub description: Option<String>,
+    pub price_pence: Option<i64>,
+    /// Cloud category id (UUID) to assign the item to.
+    pub category_id: Option<String>,
+    #[serde(default = "default_true")]
+    pub active: bool,
+    #[serde(default)]
+    pub customer_editable: bool,
+}
+
+fn default_true() -> bool {
+    true
+}
+
 pub fn router(_state: AppState) -> Router<AppState> {
     Router::new()
         .route(
             "/portal/stores/:store_id/menu",
             get(get_store_menu_and_items),
+        )
+        .route(
+            "/portal/stores/:store_id/menu/categories",
+            post(post_create_store_menu_category),
+        )
+        .route(
+            "/portal/stores/:store_id/menu/items",
+            post(post_create_store_menu_item),
         )
         .route(
             "/portal/stores/:store_id/menu/items/:item_id",
@@ -132,6 +168,7 @@ pub fn router(_state: AppState) -> Router<AppState> {
 
 async fn get_store_meta(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(StorePathParams { store_id }): Path<StorePathParams>,
 ) -> Result<Json<StoreMetaResponse>, (StatusCode, String)> {
     let db = state.db.as_ref().ok_or((
@@ -141,11 +178,24 @@ async fn get_store_meta(
     let store_uuid = Uuid::parse_str(&store_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid store_id".to_string()))?;
 
+    let allowed = db::user_can_access_store(db, &user.0, store_uuid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
+
     let row = sqlx::query(
         r#"
-        SELECT id, org_id, name
-        FROM stores
-        WHERE id = ?
+        SELECT
+          s.id,
+          s.org_id,
+          s.name,
+          s.canonical_device_id,
+          d.device_name AS canonical_device_name
+        FROM stores s
+        LEFT JOIN devices d ON d.id = s.canonical_device_id
+        WHERE s.id = ?
         "#,
     )
     .bind(store_uuid.to_string())
@@ -161,11 +211,14 @@ async fn get_store_meta(
         id: row.get::<String, _>("id"),
         org_id: row.get::<String, _>("org_id"),
         name: row.get::<String, _>("name"),
+        canonical_device_id: row.get::<Option<String>, _>("canonical_device_id"),
+        canonical_device_name: row.get::<Option<String>, _>("canonical_device_name"),
     }))
 }
 
 async fn get_store_menu_and_items(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(StorePathParams { store_id }): Path<StorePathParams>,
     Query(q): Query<MenuQuery>,
 ) -> Result<Json<MenuCategoryItemsResponse>, (StatusCode, String)> {
@@ -175,6 +228,13 @@ async fn get_store_menu_and_items(
     ))?;
     let store_uuid = Uuid::parse_str(&store_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid store_id".to_string()))?;
+
+    let allowed = db::user_can_access_store(db, &user.0, store_uuid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
 
     // Derive a device_id for this store from device_sync_state; for v1 we
     // assume a single primary device per store for menu/yield display.
@@ -345,6 +405,7 @@ async fn get_store_menu_and_items(
 
 async fn get_store_orders(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(StorePathParams { store_id }): Path<StorePathParams>,
 ) -> Result<Json<StoreOrdersResponse>, (StatusCode, String)> {
     let db = state.db.as_ref().ok_or((
@@ -353,6 +414,13 @@ async fn get_store_orders(
     ))?;
     let store_uuid = Uuid::parse_str(&store_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid store_id".to_string()))?;
+
+    let allowed = db::user_can_access_store(db, &user.0, store_uuid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
 
     let rows = sqlx::query(
         r#"
@@ -387,6 +455,7 @@ async fn get_store_orders(
 
 async fn get_store_commands(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path(StorePathParams { store_id }): Path<StorePathParams>,
 ) -> Result<Json<StoreCommandsResponse>, (StatusCode, String)> {
     let db = state.db.as_ref().ok_or((
@@ -395,6 +464,13 @@ async fn get_store_commands(
     ))?;
     let store_uuid = Uuid::parse_str(&store_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid store_id".to_string()))?;
+
+    let allowed = db::user_can_access_store(db, &user.0, store_uuid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
 
     let rows = sqlx::query(
         r#"
@@ -444,8 +520,199 @@ async fn get_store_commands(
     Ok(Json(StoreCommandsResponse { commands }))
 }
 
+async fn post_create_store_menu_category(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path(StorePathParams { store_id }): Path<StorePathParams>,
+    Json(body): Json<CreateMenuCategoryBody>,
+) -> Result<(StatusCode, Json<MenuCategory>), (StatusCode, String)> {
+    let db = state.db.as_ref().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "database not available".to_string(),
+    ))?;
+    let store_uuid = Uuid::parse_str(&store_id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "invalid store_id".to_string()))?;
+
+    let allowed = db::user_can_access_store(db, &user.0, store_uuid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
+
+    let device_id = match get_device_id_for_store(db, store_uuid).await.map_err(internal)? {
+        Some(d) => d,
+        None => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "No device linked to this store. Activate a device first.".to_string(),
+            ))
+        }
+    };
+
+    let org_row: Option<(String,)> = sqlx::query_as("SELECT org_id FROM stores WHERE id = ?")
+        .bind(store_uuid.to_string())
+        .fetch_optional(db)
+        .await
+        .map_err(internal)?;
+    let org_id = match org_row {
+        Some((id,)) => Uuid::parse_str(&id).map_err(|_| internal("invalid org_id"))?,
+        None => return Err((StatusCode::NOT_FOUND, "store not found".to_string())),
+    };
+
+    let local_menu_row: Option<(String,)> = sqlx::query_as(
+        "SELECT local_menu_id FROM pos_menu_categories WHERE device_id = ? LIMIT 1",
+    )
+    .bind(device_id.to_string())
+    .fetch_optional(db)
+    .await
+    .map_err(internal)?;
+    let local_menu_id = local_menu_row
+        .map(|(s,)| s)
+        .unwrap_or_else(|| "default".to_string());
+
+    let _ = ensure_pos_menu(db, org_id, device_id, &local_menu_id).await;
+
+    let new_id = create_pos_menu_category(
+        db,
+        org_id,
+        device_id,
+        &local_menu_id,
+        body.name.trim(),
+        body.position,
+    )
+    .await
+    .map_err(internal)?;
+
+    let _ = enqueue_apply_menu_for_store(db, store_uuid).await;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(MenuCategory {
+            id: new_id.to_string(),
+            name: body.name.trim().to_string(),
+            position: body.position,
+        }),
+    ))
+}
+
+async fn post_create_store_menu_item(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path(StorePathParams { store_id }): Path<StorePathParams>,
+    Json(body): Json<CreateMenuItemBody>,
+) -> Result<(StatusCode, Json<MenuItem>), (StatusCode, String)> {
+    let db = state.db.as_ref().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "database not available".to_string(),
+    ))?;
+    let store_uuid = Uuid::parse_str(&store_id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "invalid store_id".to_string()))?;
+
+    let allowed = db::user_can_access_store(db, &user.0, store_uuid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
+
+    let device_id = match get_device_id_for_store(db, store_uuid).await.map_err(internal)? {
+        Some(d) => d,
+        None => {
+            return Err((
+                StatusCode::BAD_REQUEST,
+                "No device linked to this store. Activate a device first.".to_string(),
+            ))
+        }
+    };
+
+    let org_row: Option<(String,)> = sqlx::query_as("SELECT org_id FROM stores WHERE id = ?")
+        .bind(store_uuid.to_string())
+        .fetch_optional(db)
+        .await
+        .map_err(internal)?;
+    let org_id = match org_row {
+        Some((id,)) => Uuid::parse_str(&id).map_err(|_| internal("invalid org_id"))?,
+        None => return Err((StatusCode::NOT_FOUND, "store not found".to_string())),
+    };
+
+    let local_category_id: Option<String> = match &body.category_id {
+        Some(cat_id) => {
+            let cat_uuid = Uuid::parse_str(cat_id)
+                .map_err(|_| (StatusCode::BAD_REQUEST, "invalid category_id".to_string()))?;
+            let row: Option<(String,)> = sqlx::query_as(
+                "SELECT local_category_id FROM pos_menu_categories WHERE id = ? AND device_id = ?",
+            )
+            .bind(cat_uuid.to_string())
+            .bind(device_id.to_string())
+            .fetch_optional(db)
+            .await
+            .map_err(internal)?;
+            match row {
+                Some((s,)) => Some(s),
+                None => {
+                    return Err((
+                        StatusCode::NOT_FOUND,
+                        "category not found in this store".to_string(),
+                    ))
+                }
+            }
+        }
+        None => None,
+    };
+
+    let local_store_row: Option<(String,)> = sqlx::query_as(
+        "SELECT local_store_id FROM pos_store_sync WHERE store_id = ? AND device_id = ? LIMIT 1",
+    )
+    .bind(store_uuid.to_string())
+    .bind(device_id.to_string())
+    .fetch_optional(db)
+    .await
+    .map_err(internal)?;
+    let local_store_id: Option<String> =
+        local_store_row.map(|(s,)| s).or_else(|| Some(store_uuid.to_string()));
+
+    let local_item_id = format!("cloud-{}", Uuid::new_v4());
+
+    let new_id = create_pos_menu_item(
+        db,
+        org_id,
+        device_id,
+        &local_item_id,
+        local_store_id.as_deref(),
+        local_category_id.as_deref(),
+        body.name.trim(),
+        body.description.as_deref(),
+        body.price_pence,
+        body.active,
+        None,
+        body.customer_editable,
+    )
+    .await
+    .map_err(internal)?;
+
+    let _ = enqueue_apply_menu_for_store(db, store_uuid).await;
+
+    Ok((
+        StatusCode::CREATED,
+        Json(MenuItem {
+            id: new_id.to_string(),
+            name: body.name.trim().to_string(),
+            description: body.description.clone(),
+            price_pence: body.price_pence,
+            active: body.active,
+            image_path: None,
+            remaining: None,
+            estimated_total: None,
+            warning_threshold: None,
+            has_modifiers: false,
+        }),
+    ))
+}
+
 async fn patch_store_menu_item(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path((store_id, item_id)): Path<(String, String)>,
     Json(body): Json<PatchMenuItemBody>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -455,6 +722,13 @@ async fn patch_store_menu_item(
     ))?;
     let store_uuid = Uuid::parse_str(&store_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid store_id".to_string()))?;
+
+    let allowed = db::user_can_access_store(db, &user.0, store_uuid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
     let item_uuid = Uuid::parse_str(&item_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid item_id".to_string()))?;
 
@@ -491,6 +765,7 @@ async fn patch_store_menu_item(
 
 async fn upload_store_menu_item_image(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path((store_id, item_id)): Path<(String, String)>,
     mut multipart: Multipart,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
@@ -500,6 +775,13 @@ async fn upload_store_menu_item_image(
     ))?;
     let store_uuid = Uuid::parse_str(&store_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid store_id".to_string()))?;
+
+    let allowed = db::user_can_access_store(db, &user.0, store_uuid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
     let item_uuid = Uuid::parse_str(&item_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid item_id".to_string()))?;
 
@@ -584,6 +866,7 @@ async fn upload_store_menu_item_image(
 
 async fn upload_store_menu_category_image(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path((store_id, category_id)): Path<(String, String)>,
     mut multipart: Multipart,
 ) -> Result<Json<serde_json::Value>, (StatusCode, String)> {
@@ -593,6 +876,13 @@ async fn upload_store_menu_category_image(
     ))?;
     let store_uuid = Uuid::parse_str(&store_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid store_id".to_string()))?;
+
+    let allowed = db::user_can_access_store(db, &user.0, store_uuid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
     let category_uuid = Uuid::parse_str(&category_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid category_id".to_string()))?;
 
@@ -685,6 +975,7 @@ async fn upload_store_menu_category_image(
 
 async fn patch_store_menu_category(
     State(state): State<AppState>,
+    user: CurrentUser,
     Path((store_id, category_id)): Path<(String, String)>,
     Json(body): Json<PatchMenuCategoryBody>,
 ) -> Result<StatusCode, (StatusCode, String)> {
@@ -694,6 +985,13 @@ async fn patch_store_menu_category(
     ))?;
     let store_uuid = Uuid::parse_str(&store_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid store_id".to_string()))?;
+
+    let allowed = db::user_can_access_store(db, &user.0, store_uuid)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !allowed {
+        return Err((StatusCode::FORBIDDEN, "store not in your account".to_string()));
+    }
     let category_uuid = Uuid::parse_str(&category_id)
         .map_err(|_| (StatusCode::BAD_REQUEST, "invalid category_id".to_string()))?;
 

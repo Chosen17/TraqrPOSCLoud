@@ -11,8 +11,8 @@
 </head>
 <body class="min-h-screen bg-ink-100">
   <div class="flex min-h-screen">
-    <!-- Sidebar -->
-    <aside class="hidden w-64 flex-col border-r border-ink-200 bg-white/90 px-4 py-6 sm:flex">
+    <!-- Sidebar: on mobile fixed and off-screen until opened -->
+    <aside id="dashboard-sidebar" class="fixed inset-y-0 left-0 z-40 flex w-64 shrink-0 flex-col border-r border-ink-200 bg-white px-4 py-6 transition-transform duration-200 -translate-x-full sm:relative sm:translate-x-0" aria-label="Main navigation">
       <a href="/" class="mb-8 inline-flex items-center gap-2 text-ink-900">
         <img src="/traqr.png" alt="Traqr" class="h-8 w-auto" />
         <span class="text-sm font-medium text-ink-600">Cloud</span>
@@ -49,17 +49,18 @@
     </aside>
 
     <!-- Main content -->
-    <main class="flex-1">
-      <!-- Top bar for mobile + user info -->
+    <main class="flex-1 min-w-0">
+      <!-- Top bar for mobile -->
       <header class="flex items-center justify-between border-b border-ink-200 bg-white px-4 py-3 sm:hidden">
-        <div class="inline-flex items-center gap-2 text-ink-900">
+        <button type="button" id="dashboard-mobile-menu-btn" class="rounded p-2 text-ink-600 hover:bg-ink-100" aria-label="Open menu">&#9776;</button>
+        <a href="/" class="inline-flex items-center gap-2 text-ink-900">
           <img src="/traqr.png" alt="Traqr" class="h-7 w-auto" />
           <span class="text-sm font-medium text-ink-600">Cloud</span>
-        </div>
-        <div class="text-xs text-ink-500">
-          <span id="user-name-mobile">Demo Admin</span>
-        </div>
+        </a>
+        <span id="user-name-mobile" class="text-xs text-ink-500">Demo Admin</span>
       </header>
+      <div id="dashboard-sidebar-overlay" class="fixed inset-0 z-30 hidden bg-black/50 sm:hidden" aria-hidden="true"></div>
+      <div id="dashboard-toast" class="mx-4 mt-4 hidden rounded-lg border px-4 py-3 text-sm sm:mx-6 lg:mx-8" role="alert"></div>
 
       <div class="mx-auto max-w-6xl px-4 py-6 sm:px-6 lg:px-8">
         <div class="flex items-center justify-between gap-4">
@@ -67,6 +68,9 @@
             <h1 class="font-display text-2xl font-bold text-ink-900">Overview</h1>
             <p class="mt-1 text-sm text-ink-600">
               Snapshot of orders, revenue, and device activity from synced POS data.
+            </p>
+            <p id="cloud-membership-status" class="mt-1 text-xs text-ink-500">
+              Cloud membership: checking…
             </p>
           </div>
           <button id="refresh-btn" class="btn-secondary text-sm">Refresh</button>
@@ -149,6 +153,33 @@
       document.getElementById('user-name-mobile').textContent = name;
     }
 
+    async function loadCloudStatus() {
+      const el = document.getElementById('cloud-membership-status');
+      if (!el) return;
+      try {
+        const res = await fetch('/api/portal/orgs');
+        if (!res.ok) throw new Error('Failed to load orgs');
+        const data = await res.json();
+        const orgs = data.organizations || [];
+        if (orgs.length === 0) {
+          el.textContent = 'Cloud membership: set up your first organisation to enable cloud sync.';
+          return;
+        }
+        const anyActive = orgs.some(o => o.cloud_sync_active);
+        if (anyActive) {
+          el.textContent = 'Cloud membership: active.';
+          el.className = 'mt-1 text-xs text-emerald-700';
+        } else {
+          el.innerHTML = 'Cloud membership: not active. <a href="/pricing" class="text-traqr-600 hover:underline">Start cloud membership</a>.';
+          el.className = 'mt-1 text-xs text-ink-600';
+        }
+      } catch (err) {
+        console.error(err);
+        el.textContent = 'Cloud membership: unable to check status.';
+        el.className = 'mt-1 text-xs text-ink-500';
+      }
+    }
+
     async function loadSummary() {
       const res = await fetch('/api/portal/dashboard/summary');
       if (!res.ok) throw new Error('Failed to load summary');
@@ -226,13 +257,38 @@
       } catch (_) {}
       await loadSummary();
       await loadRecentOrders();
+      await loadCloudStatus();
     }
 
+    function showToast(msg, type) {
+      const el = document.getElementById('dashboard-toast');
+      if (!el) return;
+      el.textContent = msg;
+      el.className = 'mx-4 mt-4 rounded-lg border px-4 py-3 text-sm sm:mx-6 lg:mx-8 ' +
+        (type === 'success' ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-red-200 bg-red-50 text-red-800');
+      el.classList.remove('hidden');
+      setTimeout(function () { el.classList.add('hidden'); }, 6000);
+    }
+    function closeDashboardNav() {
+      document.getElementById('dashboard-sidebar').classList.remove('translate-x-0');
+      document.getElementById('dashboard-sidebar').classList.add('-translate-x-full');
+      document.getElementById('dashboard-sidebar-overlay').classList.add('hidden');
+    }
+    function openDashboardNav() {
+      document.getElementById('dashboard-sidebar').classList.remove('-translate-x-full');
+      document.getElementById('dashboard-sidebar').classList.add('translate-x-0');
+      document.getElementById('dashboard-sidebar-overlay').classList.remove('hidden');
+    }
     document.getElementById('refresh-btn').addEventListener('click', () => {
       loadAll().catch((err) => {
         console.error(err);
-        alert('Failed to refresh dashboard. Check network and API logs.');
+        showToast('Failed to refresh dashboard. Check network and API.', 'error');
       });
+    });
+    document.getElementById('dashboard-mobile-menu-btn').addEventListener('click', openDashboardNav);
+    document.getElementById('dashboard-sidebar-overlay').addEventListener('click', closeDashboardNav);
+    document.getElementById('dashboard-sidebar').querySelectorAll('a').forEach(function (a) {
+      a.addEventListener('click', closeDashboardNav);
     });
 
     loadAll().catch((err) => {
@@ -241,4 +297,3 @@
   </script>
 </body>
 </html>
-

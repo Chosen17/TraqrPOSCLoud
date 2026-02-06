@@ -1,12 +1,20 @@
-use axum::{extract::State, http::StatusCode, routing::get, routing::post, Json, Router};
+use axum::{
+    extract::{Path, State},
+    http::StatusCode,
+    routing::{get, post},
+    Json, Router,
+};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use sqlx::Row;
 use uuid::Uuid;
 
+use crate::routes::portal_orgs::fetch_org_detail_by_id;
+use crate::session::CurrentUser;
 use crate::state::AppState;
 use db::{
     create_activation_key, create_organization, create_store, get_org_id_by_slug, grant_entitlement,
+    is_super_admin,
 };
 
 #[derive(Debug, Serialize)]
@@ -61,21 +69,78 @@ fn generate_activation_key() -> String {
 
 pub fn router(_state: AppState) -> Router<AppState> {
     Router::new()
+        .route("/portal/super/check", get(super_admin_check))
         .route("/portal/super/orgs", get(list_orgs_for_super_admin))
+        .route("/portal/super/orgs/:org_id", get(get_org_detail_super_admin))
         .route("/portal/super/create-customer", post(create_customer))
+}
+
+/// Returns 204 if the current user has super-admin access, 403 otherwise. Used by super-admin pages to redirect non-allowed users.
+async fn super_admin_check(
+    State(state): State<AppState>,
+    user: CurrentUser,
+) -> Result<StatusCode, (StatusCode, String)> {
+    let db = state.db.as_ref().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "database not available".to_string(),
+    ))?;
+    let ok = is_super_admin(db, &user.0)
+        .await
+        .map_err(internal)?;
+    if ok {
+        Ok(StatusCode::NO_CONTENT)
+    } else {
+        Err((
+            StatusCode::FORBIDDEN,
+            "Super admin access required.".to_string(),
+        ))
+    }
+}
+
+async fn get_org_detail_super_admin(
+    State(state): State<AppState>,
+    user: CurrentUser,
+    Path(org_id): Path<String>,
+) -> Result<Json<super::portal_orgs::OrgDetailResponse>, (StatusCode, String)> {
+    let db = state.db.as_ref().ok_or((
+        StatusCode::SERVICE_UNAVAILABLE,
+        "database not available".to_string(),
+    ))?;
+    let org_uuid = Uuid::parse_str(&org_id)
+        .map_err(|_| (StatusCode::BAD_REQUEST, "invalid org_id".to_string()))?;
+
+    let ok = is_super_admin(db, &user.0)
+        .await
+        .map_err(|e| (StatusCode::INTERNAL_SERVER_ERROR, e.to_string()))?;
+    if !ok {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Super admin access required.".to_string(),
+        ));
+    }
+
+    let data = fetch_org_detail_by_id(db, org_uuid).await?;
+    Ok(Json(data))
 }
 
 async fn list_orgs_for_super_admin(
     State(state): State<AppState>,
+    user: CurrentUser,
 ) -> Result<Json<SuperAdminOrgList>, (StatusCode, String)> {
     let db = state.db.as_ref().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "database not available".to_string(),
     ))?;
 
-    // NOTE: v1 does not actually authenticate the caller as super_admin; this
-    // is wired for internal use only. When auth_sessions are implemented we
-    // can enforce a stricter check here using db::is_super_admin.
+    let ok = is_super_admin(db, &user.0)
+        .await
+        .map_err(internal)?;
+    if !ok {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Super admin access required.".to_string(),
+        ));
+    }
 
     let rows = sqlx::query(
         r#"
@@ -123,12 +188,23 @@ async fn list_orgs_for_super_admin(
 
 async fn create_customer(
     State(state): State<AppState>,
+    user: CurrentUser,
     Json(req): Json<CreateCustomerRequest>,
 ) -> Result<Json<CreateCustomerResponse>, (StatusCode, String)> {
     let db = state.db.as_ref().ok_or((
         StatusCode::SERVICE_UNAVAILABLE,
         "database not available".to_string(),
     ))?;
+
+    let ok = is_super_admin(db, &user.0)
+        .await
+        .map_err(internal)?;
+    if !ok {
+        return Err((
+            StatusCode::FORBIDDEN,
+            "Super admin access required.".to_string(),
+        ));
+    }
 
     let org_id = match get_org_id_by_slug(db, req.org_slug.trim())
         .await

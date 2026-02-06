@@ -15,6 +15,9 @@ Give this to the team (or AI) building or maintaining the **other application** 
 3. **Menu edits from the cloud**  
    Staff can tweak the menu in the Traqr Cloud portal (e.g. change names, prices, or availability). Those changes must **reach every device** in that store.
 
+4. **Menu creation from the cloud**  
+   Staff can **create** new categories and items in the portal (not only edit existing ones). New entries get IDs like `cloud-<uuid>` for `local_category_id` / `local_item_id`. The same sync flow applies: the full menu is pushed via **apply_menu** (and returned by **GET /api/sync/menu**). No POS changes are required if you already apply the menu by those keys — treat these IDs as opaque strings.
+
 ---
 
 ## What the POS must do
@@ -87,4 +90,4 @@ Our POS must sync with Traqr Cloud for menu and multi-store:
 |-----------------|------------|
 | New device activates in a new store | GET /api/sync/menu (or ?copy_from_store_id=other) and apply menu locally |
 | User adds/changes item image on POS | POST /api/sync/upload-item-image, then send menu_item_created (with image_path) or menu_item_image event |
-| Staff edits menu in portal | Cloud sends apply_menu command; POS applies command_body and acks |
+| Staff edits or **creates** categories/items in portal | Cloud sends apply_menu command; POS applies command_body and acks |

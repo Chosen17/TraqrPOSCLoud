@@ -168,7 +168,7 @@
     }
 
     async function loadOrgs() {
-      const res = await fetch('/api/portal/super/orgs');
+      const res = await fetch('/api/portal/super/orgs', { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to load organizations');
       const data = await res.json();
       const orgs = data.organizations || [];
@@ -266,6 +266,11 @@
     }
 
     async function init() {
+      const checkRes = await fetch('/api/portal/super/check', { credentials: 'include' });
+      if (!checkRes.ok) {
+        window.location.href = '/dashboard';
+        return;
+      }
       try {
         const storedName = window.localStorage.getItem('traqr_display_name');
         if (storedName) setUserName(storedName);
